@@ -1,0 +1,111 @@
+{
+  "name": "Lead Capture - Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -304,
+        -128
+      ],
+      "id": "1feac9bb-9add-40a7-b93d-765d88084e3f",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1BBHhzCAZXfy274_rxbPAT4_-xlXmFC1ToOLVcqLWo2U",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Error Log",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Error": "={{ $json.execution?.error?.message || $json.error?.message || 'Unknown error occurred' }}",
+            "Timestamp": "={{ new Date().toISOString() }}",
+            "Workflow Name": "=Universal Lead Capture System"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Error",
+              "displayName": "Error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Workflow Name",
+              "displayName": "Workflow Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "0e150653-0ead-41b2-afb5-e34eeed1f5ae",
+      "name": "ERROR_Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -64,
+        -128
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0QcxKAYvJkX5Y0jK",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "ERROR_Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ed39dc98-3ea3-466e-9b09-4c7771de0761",
+  "meta": {
+    "instanceId": "fc216e3f060e6c72e14b350fae4edf36f624825e9901e07b43806b1dac9ab1b2"
+  },
+  "id": "baY6Z22zHL4swGCj",
+  "tags": []
+}

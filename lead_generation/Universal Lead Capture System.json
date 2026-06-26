@@ -1,0 +1,708 @@
+{
+  "name": "Universal Lead Capture System",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 🔵 TRIGGER LAYER\n**Node:** TRIGGER_Webhook\n\nAccepts POST requests to `/webhook/lead-capture`\n\n**Expected fields:**\n- full_name, email, phone\n- company_name, lead_source\n- service_interest, message, timestamp\n\n⚠️ Update webhook path slug if needed.\n\nProduction URL: http://localhost:5678/webhook/lead-capture  this is the endpoint your forms/apps will POST to",
+        "height": 240,
+        "width": 320,
+        "color": 4
+      },
+      "id": "b7a4b370-7212-492f-82ae-9220709a23ef",
+      "name": "NOTE_TriggerLayer",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-capture",
+        "options": {}
+      },
+      "id": "6ed9a346-fe41-4c19-91f6-cfac571b5819",
+      "name": "TRIGGER_Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        352
+      ],
+      "webhookId": "universal-lead-capture-webhook-001"
+    },
+    {
+      "parameters": {
+        "content": "## 🟡 VALIDATION LAYER\n**Nodes:** VALIDATE_Input → ROUTE_Validation\n\nChecks:\n✅ Email field exists\n✅ Email format is valid (regex)\n✅ Phone field exists\n\nSets `isValid` (bool) and `validationReason` on each record.\n\n**Routing:**\n- IF true → CLEAN_Data\n- IF false → STORE_InvalidLeads",
+        "height": 260,
+        "width": 340,
+        "color": 3
+      },
+      "id": "b5b6500a-7f90-46de-8802-073618517e51",
+      "name": "NOTE_ValidationLayer",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        560,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nconst email = String(data.email || '').trim();\nconst phone = String(data.phone || '').trim();\nconst emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\nlet isValid = true;\nconst reasons = [];\n\nif (!email) {\n  isValid = false;\n  reasons.push('Email is missing');\n} else if (!emailRegex.test(email)) {\n  isValid = false;\n  reasons.push('Email format is invalid');\n}\n\nif (!phone) {\n  isValid = false;\n  reasons.push('Phone number is missing');\n}\n\nreturn [{\n  json: {\n    ...data,\n    isValid,\n    validationReason: reasons.length > 0 ? reasons.join('; ') : 'Valid'\n  }\n}];"
+      },
+      "id": "a0f31eda-2535-41df-b886-276e9984ebee",
+      "name": "VALIDATE_Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isValid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "d0567d4e-7468-4720-89bd-0d47988066a6",
+      "name": "ROUTE_Validation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        816,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🔴 INVALID LEAD BRANCH\n**Node:** STORE_InvalidLeads\n\nRouted here when:\n- Email is missing or malformed\n- Phone is missing\n\nStores to 'Invalid Leads' sheet tab.\n\n⚠️ Replace `YOUR_SPREADSHEET_ID`\n⚠️ Create sheet tab named: **Invalid Leads**\n\nColumns: Full Name | Email | Phone | Reason | Timestamp",
+        "height": 260,
+        "width": 340
+      },
+      "id": "97b069ac-bedb-4643-ba94-7309552d17cf",
+      "name": "NOTE_InvalidBranch",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        416,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1BBHhzCAZXfy274_rxbPAT4_-xlXmFC1ToOLVcqLWo2U",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Invalid Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Email": "={{ $json['email'] }}",
+            "Phone": "={{ $json['phone'] }}",
+            "Reason": "={{ $json['validationReason'] }}",
+            "Timestamp": "={{ $json['timestamp'] || new Date().toISOString() }}",
+            "Full Name ": "={{ $json['full Name'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Full Name ",
+              "displayName": "Full Name ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Reason",
+              "displayName": "Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "74e6d7e0-18c5-4a8c-935c-573ce178f147",
+      "name": "STORE_InvalidLeads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        752,
+        736
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0QcxKAYvJkX5Y0jK",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 🟢 DATA CLEANING LAYER\n**Node:** CLEAN_Data\n\nOperations:\n- Trim leading/trailing whitespace from all text fields\n- Convert email to lowercase\n- Standardize phone: 10-digit → XXX-XXX-XXXX\n- Collapse duplicate internal spaces\n- Strip unsafe special characters from text fields",
+        "height": 240,
+        "width": 320,
+        "color": 3
+      },
+      "id": "7fd9bf47-d5c0-47fc-8173-0c7d577f4b49",
+      "name": "NOTE_CleaningLayer",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        976,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nconst cleanText = (val) => {\n  if (typeof val !== 'string') return String(val || '');\n  return val\n    .trim()\n    .replace(/\\s+/g, ' ')\n    .replace(/[^\\w\\s@.,\\-'&#()/]/g, '');\n};\n\nconst standardizePhone = (phone) => {\n  if (!phone) return '';\n  const raw = String(phone);\n  const digits = raw.replace(/\\D/g, '');\n  if (digits.length === 10) {\n    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;\n  } else if (digits.length === 11 && digits.startsWith('1')) {\n    return `+1-${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;\n  }\n  return raw.trim();\n};\n\nreturn [{\n  json: {\n    ...data,\n    full_name: cleanText(data.full_name),\n    email: String(data.email || '').toLowerCase().trim(),\n    phone: standardizePhone(data.phone),\n    company_name: cleanText(data.company_name),\n    lead_source: cleanText(data.lead_source),\n    service_interest: cleanText(data.service_interest),\n    message: cleanText(data.message)\n  }\n}];"
+      },
+      "id": "95208676-670b-439d-bea8-42f0e55607b8",
+      "name": "CLEAN_Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🔵 PROCESSING LAYER\n**Node:** PROCESS_GenerateLeadID\n\nGenerates unique Lead ID:\n`LEAD-YYYYMMDD-RAND4`\nExample: `LEAD-20240515-4823`\n\nAdds fields:\n- `leadId` — unique identifier\n- `created_date` — ISO 8601 timestamp\n- `status` — set to 'New'",
+        "height": 240,
+        "width": 320,
+        "color": 4
+      },
+      "id": "71994223-d482-411d-a426-f279542133f7",
+      "name": "NOTE_ProcessingLayer",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nconst now = new Date();\nconst year = now.getFullYear();\nconst month = String(now.getMonth() + 1).padStart(2, '0');\nconst day = String(now.getDate()).padStart(2, '0');\nconst dateStr = `${year}${month}${day}`;\nconst rand = Math.floor(1000 + Math.random() * 9000);\nconst leadId = `LEAD-${dateStr}-${rand}`;\n\nreturn [{\n  json: {\n    ...data,\n    leadId,\n    created_date: now.toISOString(),\n    status: 'New'\n  }\n}];"
+      },
+      "id": "26c8725a-f135-4196-acf0-bcb8ed687650",
+      "name": "PROCESS_GenerateLeadID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🟣 STORAGE LAYER\n**Node:** STORE_GoogleSheets\n\nPrimary DB: Google Sheets → 'Lead Database' tab.\n\n⚠️ Replace `YOUR_SPREADSHEET_ID`\n⚠️ Create sheet tab named: **Lead Database**\n\nColumns: Lead ID | Full Name | Email | Phone | Company | Source | Service Interest | Message | Status | Timestamp | Created Date\n\n**Modular:** Swap this node with:\nHubSpot / Salesforce / Airtable / PostgreSQL",
+        "height": 300,
+        "width": 340,
+        "color": 6
+      },
+      "id": "73c90c63-9538-4e17-9127-2d3627e8e75a",
+      "name": "NOTE_StorageLayer",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1BBHhzCAZXfy274_rxbPAT4_-xlXmFC1ToOLVcqLWo2U",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Lead Database",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Lead ID": "={{ $json['leadId'] }}",
+            "Full Name": "={{ $json['full_name'] }}",
+            "Email": "={{ $json['email'] }}",
+            "Phone": "={{ $json['phone'] }}",
+            "Company": "={{ $json['company_name'] }}",
+            "Source": "={{ $json['lead_source'] }}",
+            "Service Interest": "={{ $json['service_interest'] }}",
+            "Message": "={{ $json['message'] }}",
+            "Status": "={{ $json['status'] }}",
+            "Timestamp": "={{ $json['timestamp'] }}",
+            "Created Date": "={{ $json['created_date'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Lead ID",
+              "displayName": "Lead ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Full Name",
+              "displayName": "Full Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Service Interest",
+              "displayName": "Service Interest",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Created Date",
+              "displayName": "Created Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "3574ce3e-65b9-4631-9590-da71ca76ff37",
+      "name": "STORE_GoogleSheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1664,
+        336
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0QcxKAYvJkX5Y0jK",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 📧 NOTIFICATION LAYER\n**Node:** NOTIFY_Gmail\n\nSends admin email alert on every new lead.\n\n⚠️ Replace `admin@yourdomain.com` with your admin email\n⚠️ Connect Gmail OAuth2 credential\n\nSubject: 🚀 New Lead Captured - {leadId}",
+        "height": 220,
+        "width": 438,
+        "color": 3
+      },
+      "id": "f67f8fa1-f334-4d97-93ed-06ea029c45f8",
+      "name": "NOTE_NotificationLayer",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1984,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "coo.venturelyhub@gmail.com",
+        "subject": "=🚀 New Lead Captured - {{ $json['leadId'] }}",
+        "message": "=<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;\">\n  <h2 style=\"color:#1d4ed8;border-bottom:2px solid #1d4ed8;padding-bottom:8px;\">🚀 New Lead Received</h2>\n  <table style=\"width:100%;border-collapse:collapse;\">\n    <tr style=\"background:#f1f5f9;\">\n      <td style=\"padding:10px;border:1px solid #e2e8f0;font-weight:bold;width:35%;\">Lead ID</td>\n      <td style=\"padding:10px;border:1px solid #e2e8f0;font-family:monospace;color:#1d4ed8;\">{{ $json['leadId'] }}</td>\n    </tr>\n    <tr>\n      <td style=\"padding:10px;border:1px solid #e2e8f0;font-weight:bold;\">Name</td>\n      <td style=\"padding:10px;border:1px solid #e2e8f0;\">{{ $json['full_name'] }}</td>\n    </tr>\n    <tr style=\"background:#f1f5f9;\">\n      <td style=\"padding:10px;border:1px solid #e2e8f0;font-weight:bold;\">Email</td>\n      <td style=\"padding:10px;border:1px solid #e2e8f0;\">{{ $json['email'] }}</td>\n    </tr>\n    <tr>\n      <td style=\"padding:10px;border:1px solid #e2e8f0;font-weight:bold;\">Phone</td>\n      <td style=\"padding:10px;border:1px solid #e2e8f0;\">{{ $json['phone'] }}</td>\n    </tr>\n    <tr style=\"background:#f1f5f9;\">\n      <td style=\"padding:10px;border:1px solid #e2e8f0;font-weight:bold;\">Company</td>\n      <td style=\"padding:10px;border:1px solid #e2e8f0;\">{{ $json['company_name'] }}</td>\n    </tr>\n    <tr>\n      <td style=\"padding:10px;border:1px solid #e2e8f0;font-weight:bold;\">Source</td>\n      <td style=\"padding:10px;border:1px solid #e2e8f0;\">{{ $json['lead_source'] }}</td>\n    </tr>\n    <tr style=\"background:#f1f5f9;\">\n      <td style=\"padding:10px;border:1px solid #e2e8f0;font-weight:bold;\">Service Interest</td>\n      <td style=\"padding:10px;border:1px solid #e2e8f0;\">{{ $json['service_interest'] }}</td>\n    </tr>\n    <tr>\n      <td style=\"padding:10px;border:1px solid #e2e8f0;font-weight:bold;\">Message</td>\n      <td style=\"padding:10px;border:1px solid #e2e8f0;\">{{ $json['message'] }}</td>\n    </tr>\n    <tr style=\"background:#f1f5f9;\">\n      <td style=\"padding:10px;border:1px solid #e2e8f0;font-weight:bold;\">Timestamp</td>\n      <td style=\"padding:10px;border:1px solid #e2e8f0;\">{{ $json['timestamp'] }}</td>\n    </tr>\n  </table>\n  <p style=\"color:#64748b;font-size:12px;margin-top:16px;\">Generated by Universal Lead Capture System</p>\n</div>",
+        "options": {}
+      },
+      "id": "8aae2e19-c304-48fa-b254-c26dc7fc3664",
+      "name": "NOTIFY_Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        1952,
+        336
+      ],
+      "webhookId": "f93794c7-9e88-430d-8a84-61bdf1e1fad1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "7A74K4rHaBhVxDPW",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 📬 AUTO-REPLY LAYER\n**Node:** AUTOREPLY_Gmail\n\n⛔ **DISABLED BY DEFAULT**\nEnable this node when ready to activate.\n\nSends acknowledgment email directly to the lead.\n\n⚠️ Connect Gmail OAuth2 credential\n⚠️ Right-click node → Enable to activate",
+        "height": 220,
+        "width": 320,
+        "color": 7
+      },
+      "id": "8db25300-6c94-4978-9946-2c550eead793",
+      "name": "NOTE_AutoReplyLayer",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2384,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json['email'] }}",
+        "subject": "Thank you for contacting us",
+        "message": "=<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;\">\n  <p>Hi {{ $json['full_name'] }},</p>\n  <p>Thank you for reaching out to us.</p>\n  <p>We have received your request and our team will get back to you shortly.</p>\n  <br/>\n  <p>Regards,<br/><strong>Team</strong></p>\n</div>",
+        "options": {}
+      },
+      "id": "ed0fa917-b325-4a4b-840f-44737e7d15ea",
+      "name": "AUTOREPLY_Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        336
+      ],
+      "webhookId": "e7123a95-5b4d-4e33-8cb9-ee34b5e99d04",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "7A74K4rHaBhVxDPW",
+          "name": "Gmail account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "content": "## 🔴 ERROR HANDLING\n**Nodes:** ERROR_Trigger → ERROR_Log\n\nCaptures all workflow execution errors.\nLogs to 'Error Log' tab in Google Sheets.\n\n**To activate:**\n1. In Settings → Error Workflow, enter the ID of a separate copy of these two nodes as a standalone workflow.\n2. Create sheet tab named: **Error Log**\n\nColumns: Error | Timestamp | Workflow Name\n\n⚠️ Replace `YOUR_SPREADSHEET_ID`",
+        "height": 300,
+        "width": 360
+      },
+      "id": "182cb48d-ac49-452a-bf19-3a24adbcf810",
+      "name": "NOTE_ErrorHandling",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        224,
+        880
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "b87cc3b1-b421-4b6b-b9ac-a41c05bdcdc6",
+      "name": "ERROR_Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        1216
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1BBHhzCAZXfy274_rxbPAT4_-xlXmFC1ToOLVcqLWo2U",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Error Log",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Error": "={{ $json.execution?.error?.message || $json.error?.message || 'Unknown error occurred' }}",
+            "Timestamp": "={{ new Date().toISOString() }}",
+            "Workflow Name": "=Universal Lead Capture System"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Error",
+              "displayName": "Error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Workflow Name",
+              "displayName": "Workflow Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "ce8f2b20-6e3c-4982-9765-edef8f402536",
+      "name": "ERROR_Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        512,
+        1216
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0QcxKAYvJkX5Y0jK",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "TRIGGER_Webhook": {
+      "main": [
+        [
+          {
+            "node": "VALIDATE_Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDATE_Input": {
+      "main": [
+        [
+          {
+            "node": "ROUTE_Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ROUTE_Validation": {
+      "main": [
+        [
+          {
+            "node": "CLEAN_Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "STORE_InvalidLeads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CLEAN_Data": {
+      "main": [
+        [
+          {
+            "node": "PROCESS_GenerateLeadID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PROCESS_GenerateLeadID": {
+      "main": [
+        [
+          {
+            "node": "STORE_GoogleSheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "STORE_GoogleSheets": {
+      "main": [
+        [
+          {
+            "node": "NOTIFY_Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NOTIFY_Gmail": {
+      "main": [
+        [
+          {
+            "node": "AUTOREPLY_Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ERROR_Trigger": {
+      "main": [
+        [
+          {
+            "node": "ERROR_Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "baY6Z22zHL4swGCj",
+    "timezone": "Asia/Kolkata",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "1ad77edf-e37c-4cab-b592-1e4b01e53980",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fc216e3f060e6c72e14b350fae4edf36f624825e9901e07b43806b1dac9ab1b2"
+  },
+  "id": "JKfUhTnVOYnY03h9",
+  "tags": []
+}
