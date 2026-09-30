@@ -1,0 +1,388 @@
+{
+  "name": "VenturelyHub Prospect Intelligence",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## \ud83c\udfaf VENTURELYHUB PROSPECT INTELLIGENCE\n**Stateless Prospect Research & Strategic Fit Pipeline**\n\n- Trigger: `POST /webhook/prospect-intelligence`\n- Role: Researches & qualifies prospects for VenturelyHub.\n- CRM Rule: Zero persistent database or sheet storage.\n- Division of Labor: Gemini (Factual Research) \u2192 Claude (Fit Analysis).",
+        "height": 220,
+        "width": 440,
+        "color": 4
+      },
+      "id": "note-overview-001",
+      "name": "NOTE_Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prospect-intelligence",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "node-trigger-input-001",
+      "name": "TRIGGER_ProspectInput",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        360
+      ],
+      "webhookId": "vh-prospect-intelligence-webhook-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\n// Support input whether direct payload, nested in body, or from a test runner\nconst data = (raw.body && typeof raw.body === 'object') ? raw.body : raw;\n\nconst cleanStr = (val) => {\n  if (val === null || val === undefined) return '';\n  return String(val).trim();\n};\n\nconst orgName = cleanStr(data.organization_name);\nconst rawWebsite = cleanStr(data.website);\nlet website = rawWebsite;\nif (website && !/^https?:\\/\\//i.test(website)) {\n  website = 'https://' + website;\n}\n\nconst linkedin = cleanStr(data.linkedin_url);\nconst orgType = cleanStr(data.organization_type);\nconst city = cleanStr(data.city);\nconst state = cleanStr(data.state);\nconst country = cleanStr(data.country);\nconst userNotes = cleanStr(data.user_notes);\n\n// Build location summary\nconst locationParts = [city, state, country].filter(Boolean);\nconst location = locationParts.length > 0 ? locationParts.join(', ') : 'Location not specified';\n\nif (!orgName) {\n  return [{\n    json: {\n      isValid: false,\n      errorCode: 'MISSING_REQUIRED_FIELD',\n      errorMessage: 'Field organization_name is required and cannot be empty.',\n      input: {\n        organization_name: '',\n        website: website || 'Not provided',\n        linkedin_url: linkedin || 'Not provided',\n        organization_type: orgType || 'Not specified',\n        location: location,\n        user_notes: userNotes || 'None'\n      }\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    isValid: true,\n    input: {\n      organization_name: orgName,\n      website: website || 'Not provided',\n      linkedin_url: linkedin || 'Not provided',\n      organization_type: orgType || 'Not specified',\n      city: city || '',\n      state: state || '',\n      country: country || '',\n      location: location,\n      user_notes: userNotes || 'None'\n    }\n  }\n}];"
+      },
+      "id": "node-validate-input-001",
+      "name": "VALIDATE_Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-route-validation-001",
+      "name": "ROUTE_Validation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## \ud83d\udd0d GEMINI RESEARCH LAYER\n**Node:** RESEARCH_Gemini\n\n- Role: Grounded factual investigation.\n- Web Search & URL context enabled.\n- Rules: Zero hallucination, strict citations.\n- Output: Clean JSON profile.",
+        "height": 220,
+        "width": 460,
+        "color": 6
+      },
+      "id": "note-gemini-research-001",
+      "name": "NOTE_GeminiResearch",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        980,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst inp = item.input;\nconst today = new Date().toISOString().split('T')[0];\n\nconst prompt = `You are an objective B2B prospect researcher. Your task is to gather factual, publicly verified information about the target organization.\n\nTARGET ORGANIZATION:\n- Name: ${inp.organization_name}\n- Official Website: ${inp.website}\n- LinkedIn: ${inp.linkedin_url}\n- Declared Type: ${inp.organization_type}\n- Location: ${inp.location}\n- User Notes: ${inp.user_notes}\n\nGROUNDING & RESEARCH RULES:\n1. Research publicly available information using Google Search and official domains.\n2. Ground every factual claim in verifiable public sources. Cite source URLs for every key piece of information.\n3. NEVER fabricate or extrapolate: programs, startup counts, portfolio metrics, funding numbers, client names, or statistics.\n4. If a piece of information cannot be verified from public sources, write \"Not found\" or \"Not publicly verified\". Do not guess.\n5. Identify publicly available contact roles/departments (e.g. \"Head of Incubation\", \"Program Director\", \"CTO\", \"Partnerships Lead\"). DO NOT guess individual private emails or personal phone numbers. If no public role is verified, return [\"Relevant contact not publicly verified\"].\n6. Output MUST be valid JSON adhering strictly to the schema below. Do not wrap in commentary.\n\nREQUIRED JSON SCHEMA:\n{\n  \"organization\": {\n    \"name\": \"${inp.organization_name}\",\n    \"website\": \"${inp.website !== 'Not provided' ? inp.website : 'Official website URL or Not found'}\",\n    \"type\": \"Incubator/Accelerator | Startup | Enterprise/SME | Government/Academic\",\n    \"location\": \"${inp.location}\"\n  },\n  \"description\": \"2-3 sentences summarizing what the organization does, verified from public sources.\",\n  \"focus_areas\": [\"List of core focus areas, sectors, or domains\"],\n  \"industries\": [\"Industries served\"],\n  \"programs\": [\"Names of verified programs, cohorts, initiatives, or products\"],\n  \"technology_focus\": [\"Verified technologies, tech stacks, or domains e.g. AI/ML, Cloud, IoT, Web\"],\n  \"relevant_activities\": [\"Recent verified initiatives, hackathons, batch launches, or press releases\"],\n  \"partnership_signals\": [\"Verified signs of external collaboration, ecosystem partners, or tech partnerships\"],\n  \"relevant_contact_roles\": [\"Publicly verified job titles/roles suitable for technology outreach\"],\n  \"sources\": [\"List of public URLs where information was verified\"],\n  \"research_date\": \"${today}\"\n}`;\n\nreturn [{\n  json: {\n    ...item,\n    gemini_prompt: prompt\n  }\n}];"
+      },
+      "id": "node-prep-gemini-001",
+      "name": "PREPARE_GeminiPrompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.gemini_prompt }}",
+              "role": "user"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "builtInTools": {
+          "googleSearch": true,
+          "urlContext": true
+        },
+        "options": {
+          "systemMessage": "You are a factual B2B research analyst. Ground every claim in public evidence. Output valid JSON only."
+        }
+      },
+      "id": "node-gemini-research-001",
+      "name": "RESEARCH_Gemini",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1240,
+        360
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "vh_google_gemini_api",
+          "name": "Google Gemini account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst rawInput = item.input;\nconst today = new Date().toISOString().split('T')[0];\n\n// Handle Gemini response from langchain node or direct output\nlet geminiText = '';\nif (item.response && typeof item.response === 'string') {\n  geminiText = item.response;\n} else if (item.text && typeof item.text === 'string') {\n  geminiText = item.text;\n} else if (typeof item === 'string') {\n  geminiText = item;\n} else if (item.content && typeof item.content === 'string') {\n  geminiText = item.content;\n} else {\n  // If response is already an object\n  if (item.organization && item.description) {\n    return [{\n      json: {\n        input: rawInput,\n        structured_research: item,\n        research_status: 'VERIFIED'\n      }\n    }];\n  }\n}\n\n// Extract JSON from potential markdown fences\nlet parsed = null;\nif (geminiText) {\n  try {\n    const jsonMatch = geminiText.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/) || [null, geminiText];\n    const cleanJson = (jsonMatch[1] || geminiText).trim();\n    parsed = JSON.parse(cleanJson);\n  } catch (e) {\n    parsed = null;\n  }\n}\n\n// Fallback if parsing fails or response was empty\nif (!parsed || typeof parsed !== 'object') {\n  parsed = {\n    organization: {\n      name: rawInput.organization_name,\n      website: rawInput.website || 'Not publicly verified',\n      type: rawInput.organization_type || 'Unknown',\n      location: rawInput.location || 'Not publicly verified'\n    },\n    description: 'Limited public information could be verified for this organization.',\n    focus_areas: [],\n    industries: [],\n    programs: [],\n    technology_focus: [],\n    relevant_activities: [],\n    partnership_signals: [],\n    relevant_contact_roles: ['Relevant contact not publicly verified'],\n    sources: rawInput.website && rawInput.website !== 'Not provided' ? [rawInput.website] : [],\n    research_date: today\n  };\n}\n\n// Ensure all schema fields exist defensively\nconst structuredResearch = {\n  organization: {\n    name: parsed.organization?.name || rawInput.organization_name,\n    website: parsed.organization?.website || rawInput.website || 'Not publicly verified',\n    type: parsed.organization?.type || rawInput.organization_type || 'Not publicly verified',\n    location: parsed.organization?.location || rawInput.location || 'Not publicly verified'\n  },\n  description: parsed.description || 'Limited public information could be verified for this organization.',\n  focus_areas: Array.isArray(parsed.focus_areas) ? parsed.focus_areas : [],\n  industries: Array.isArray(parsed.industries) ? parsed.industries : [],\n  programs: Array.isArray(parsed.programs) ? parsed.programs : [],\n  technology_focus: Array.isArray(parsed.technology_focus) ? parsed.technology_focus : [],\n  relevant_activities: Array.isArray(parsed.relevant_activities) ? parsed.relevant_activities : [],\n  partnership_signals: Array.isArray(parsed.partnership_signals) ? parsed.partnership_signals : [],\n  relevant_contact_roles: Array.isArray(parsed.relevant_contact_roles) && parsed.relevant_contact_roles.length > 0 \n    ? parsed.relevant_contact_roles \n    : ['Relevant contact not publicly verified'],\n  sources: Array.isArray(parsed.sources) ? parsed.sources : [],\n  research_date: parsed.research_date || today\n};\n\nconst desc = structuredResearch.description || '';\nconst isFallbackDesc = desc.toLowerCase().includes('limited public information') || desc.toLowerCase().includes('public description not found');\nconst hasSubstantialData = (!isFallbackDesc) && (structuredResearch.focus_areas.length > 0 || structuredResearch.programs.length > 0 || desc.length > 50);\n\nreturn [{\n  json: {\n    input: rawInput,\n    structured_research: structuredResearch,\n    research_status: hasSubstantialData ? 'VERIFIED' : 'INSUFFICIENT_DATA'\n  }\n}];"
+      },
+      "id": "node-struct-research-001",
+      "name": "STRUCTURE_Research",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## \ud83e\udde0 CLAUDE STRATEGIC FIT LAYER\n**Node:** ANALYZE_Claude\n\n- Role: Commercial relevance, offer selection & angle.\n- Input: Factual research from Gemini (no fact inventing).\n- Context: VenturelyHub services & partnership models.\n- Output: Fit level, recommended offer & CTA.",
+        "height": 220,
+        "width": 460,
+        "color": 3
+      },
+      "id": "note-claude-analysis-001",
+      "name": "NOTE_ClaudeAnalysis",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst res = item.structured_research;\nconst researchStatus = item.research_status;\n\nconst prompt = `You are the Senior Commercial Strategy & Sales Intelligence Lead for VenturelyHub.\nAnalyze the following factual prospect research and generate strategic qualification and outreach recommendations.\n\nVENTURELYHUB COMPANY PROFILE & CORE CAPABILITIES:\nVenturelyHub is a technology innovation and engineering partner serving incubators, startups, and enterprises:\n- Product Engineering & Custom Software\n- Web Development & Mobile App Development (iOS/Android/Flutter)\n- SaaS Development & Enterprise Platforms\n- AI Development, Custom AI Agents & Autonomous Chatbots\n- AI Analytics, Predictive BI & Data Intelligence\n- Cloud Architecture, DevOps Automation, Server Management & CI/CD\n- UI/UX Design, Design Systems & Product Strategy\n- Custom SDK Development & API Integrations\n- Startup Product Acceleration (MVP development, Tech clinics, CTO advisory)\n\nFACTUAL RESEARCH DATA (Strictly grounded - do NOT invent facts beyond this):\n${JSON.stringify(res, null, 2)}\n\nRESEARCH STATUS: ${researchStatus}\n\nANALYSIS INSTRUCTIONS:\n1. VENTURELYHUB RELEVANCE: Analyze how VenturelyHub's specific capabilities map to this organization's verified profile.\n2. FIT LEVEL: Choose exactly one: HIGH | MEDIUM | LOW | INSUFFICIENT_DATA. Explain the concrete reasoning (no arbitrary numbers). If public research is sparse, choose INSUFFICIENT_DATA or LOW.\n3. RELEVANT SERVICES: Select 2 to 4 matching VenturelyHub services supported by the evidence.\n4. RECOMMENDED OFFER: Select or design a tailored offer aligned with their segment:\n   - For Incubators/Accelerators: Technology Partner, Startup Product Clinic, AI/Product Workshop, Technical Office Hours\n   - For Startups: MVP Development, AI Agent Engineering, SaaS Engineering, Cloud/DevOps\n   - For Enterprises/SMEs: Custom Enterprise Software, AI Integration, Cloud Modernization, Custom SDK\n5. VALUE PROPOSITION: One compelling, specific sentence articulating why VenturelyHub adds value to them.\n6. PERSONALIZATION ANGLE: Specific context or recent initiative to reference in outreach.\n7. RECOMMENDED CONTACT ROLE: Target public job title (e.g. \"Head of Incubation\", \"CTO\", \"Director of Partnerships\").\n8. SUGGESTED CTA: Low-friction call-to-action suitable for cold outreach (e.g., exploratory 15-min chat, technical workshop offer).\n9. POTENTIAL OBJECTIONS: Anticipate 2 realistic commercial or technical objections.\n10. CONFIDENCE: HIGH | MEDIUM | LOW.\n11. SEPARATE FACTS FROM ANALYSIS: Clearly state analysis as strategic opportunity rather than established fact.\n\nReturn ONLY valid JSON matching this schema:\n{\n  \"fit_level\": \"HIGH | MEDIUM | LOW | INSUFFICIENT_DATA\",\n  \"fit_reasons\": [\"Point 1 explaining why\", \"Point 2 explaining why\"],\n  \"relevant_services\": [\"Service 1\", \"Service 2\"],\n  \"recommended_offer\": \"Concise name and description of recommended offer\",\n  \"value_proposition\": \"Clear, compelling value proposition\",\n  \"personalization_angle\": \"Angle grounded in verified research\",\n  \"recommended_contact_role\": \"Target role title\",\n  \"suggested_cta\": \"Specific low-friction CTA\",\n  \"potential_objections\": [\"Objection 1 and response hint\", \"Objection 2 and response hint\"],\n  \"confidence\": \"HIGH | MEDIUM | LOW\"\n}`;\n\nreturn [{\n  json: {\n    ...item,\n    claude_prompt: prompt\n  }\n}];"
+      },
+      "id": "node-prep-claude-001",
+      "name": "PREPARE_ClaudePrompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-3-7-sonnet-20250219"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.claude_prompt }}",
+              "role": "user"
+            }
+          ]
+        },
+        "options": {
+          "systemMessage": "You are a senior B2B sales strategist for VenturelyHub. Ground all analysis in the provided factual research. Return valid JSON only."
+        }
+      },
+      "id": "node-claude-analysis-001",
+      "name": "ANALYZE_Claude",
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        2020,
+        360
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "vh_anthropic_api",
+          "name": "Anthropic account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## \ud83d\udce6 STRUCTURED OUTPUT LAYER\n**Nodes:** FORMAT_Output & FORMAT_ErrorOutput\n\n- Outputs unified contract-compliant payload.\n- Contains: `prospect_profile`, `research`, `venturelyhub_analysis`, and `metadata`.\n- Directly returns payload to caller.",
+        "height": 220,
+        "width": 400,
+        "color": 5
+      },
+      "id": "note-output-layer-001",
+      "name": "NOTE_OutputLayer",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2280,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst res = item.structured_research;\nconst rawInput = item.input;\nconst today = new Date().toISOString();\n\nlet claudeText = '';\nif (item.response && typeof item.response === 'string') {\n  claudeText = item.response;\n} else if (item.text && typeof item.text === 'string') {\n  claudeText = item.text;\n} else if (typeof item === 'string') {\n  claudeText = item;\n} else if (item.content && typeof item.content === 'string') {\n  claudeText = item.content;\n}\n\nlet analysis = null;\nif (claudeText) {\n  try {\n    const jsonMatch = claudeText.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/) || [null, claudeText];\n    const cleanJson = (jsonMatch[1] || claudeText).trim();\n    analysis = JSON.parse(cleanJson);\n  } catch (e) {\n    analysis = null;\n  }\n}\n\n// Fallback if Claude node was simulated or response was raw\nif (!analysis || typeof analysis !== 'object') {\n  const isInsuff = item.research_status === 'INSUFFICIENT_DATA';\n  analysis = {\n    fit_level: isInsuff ? 'INSUFFICIENT_DATA' : 'MEDIUM',\n    fit_reasons: isInsuff \n      ? ['Insufficient public information available to verify commercial technology fit.']\n      : ['Analysis generated based on available verified public profile data.'],\n    relevant_services: isInsuff ? [] : ['Product Engineering', 'AI Development', 'Cloud Architecture'],\n    recommended_offer: isInsuff ? 'Preliminary Discovery / Qualification' : 'Exploratory Technology Capabilities Consultation',\n    value_proposition: isInsuff \n      ? 'Pending further direct discovery with organization leadership.'\n      : `Supporting ${res.organization.name} with dedicated software engineering and AI capabilities.`,\n    personalization_angle: isInsuff\n      ? 'Requesting initial discussion on their current technology objectives and roadmap.'\n      : `Focus on their activities in ${res.focus_areas.join(', ') || 'technology innovation'}.`,\n    recommended_contact_role: res.relevant_contact_roles[0] || 'Relevant contact not publicly verified.',\n    suggested_cta: isInsuff\n      ? 'Introductory query to establish correct point of contact.'\n      : 'Invite for a brief 15-minute technology alignment conversation.',\n    potential_objections: isInsuff \n      ? ['Unknown project requirements or operational scale']\n      : ['Existing internal tech team or development partners', 'Budget allocation'],\n    confidence: isInsuff ? 'LOW' : 'MEDIUM'\n  };\n}\n\n// Construct standard final output object per contract\nconst finalOutput = {\n  prospect_profile: {\n    organization_name: res.organization.name,\n    website: res.organization.website,\n    type: res.organization.type,\n    location: res.organization.location,\n    description: res.description,\n    focus_areas: res.focus_areas,\n    industries: res.industries,\n    programs: res.programs,\n    technology_focus: res.technology_focus\n  },\n  research: {\n    relevant_activities: res.relevant_activities,\n    partnership_signals: res.partnership_signals,\n    relevant_contact_roles: res.relevant_contact_roles,\n    sources: res.sources,\n    research_date: res.research_date\n  },\n  venturelyhub_analysis: {\n    fit_level: analysis.fit_level || 'MEDIUM',\n    fit_reasons: Array.isArray(analysis.fit_reasons) ? analysis.fit_reasons : [String(analysis.fit_reasons)],\n    relevant_services: Array.isArray(analysis.relevant_services) ? analysis.relevant_services : [],\n    recommended_offer: analysis.recommended_offer || 'Technology Partnership Discussion',\n    value_proposition: analysis.value_proposition || '',\n    personalization_angle: analysis.personalization_angle || '',\n    recommended_contact_role: analysis.recommended_contact_role || 'Relevant contact not publicly verified.',\n    suggested_cta: analysis.suggested_cta || '',\n    potential_objections: Array.isArray(analysis.potential_objections) ? analysis.potential_objections : [],\n    confidence: analysis.confidence || 'MEDIUM'\n  },\n  metadata: {\n    workflow_name: 'VenturelyHub Prospect Intelligence',\n    processed_at: today,\n    status: 'SUCCESS'\n  }\n};\n\nreturn [{ json: finalOutput }];"
+      },
+      "id": "node-format-output-001",
+      "name": "FORMAT_Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2280,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst inp = item.input || {};\nconst today = new Date().toISOString();\n\nreturn [{\n  json: {\n    error: {\n      code: item.errorCode || 'VALIDATION_ERROR',\n      message: item.errorMessage || 'Prospect input validation failed.'\n    },\n    prospect_profile: {\n      organization_name: inp.organization_name || 'Not provided',\n      website: inp.website || 'Not provided',\n      type: inp.organization_type || 'Not specified',\n      location: inp.location || 'Not specified',\n      description: 'Validation failed before research could begin.',\n      focus_areas: [],\n      industries: [],\n      programs: [],\n      technology_focus: []\n    },\n    research: {\n      relevant_activities: [],\n      partnership_signals: [],\n      relevant_contact_roles: ['Relevant contact not publicly verified.'],\n      sources: [],\n      research_date: today.split('T')[0]\n    },\n    venturelyhub_analysis: {\n      fit_level: 'INSUFFICIENT_DATA',\n      fit_reasons: ['Validation error: ' + (item.errorMessage || 'Missing required organization name.')],\n      relevant_services: [],\n      recommended_offer: 'None',\n      value_proposition: 'None',\n      personalization_angle: 'None',\n      recommended_contact_role: 'Relevant contact not publicly verified.',\n      suggested_cta: 'None',\n      potential_objections: [],\n      confidence: 'LOW'\n    },\n    metadata: {\n      workflow_name: 'VenturelyHub Prospect Intelligence',\n      processed_at: today,\n      status: 'VALIDATION_FAILED'\n    }\n  }\n}];"
+      },
+      "id": "node-format-error-001",
+      "name": "FORMAT_ErrorOutput",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        620
+      ]
+    }
+  ],
+  "connections": {
+    "TRIGGER_ProspectInput": {
+      "main": [
+        [
+          {
+            "node": "VALIDATE_Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDATE_Input": {
+      "main": [
+        [
+          {
+            "node": "ROUTE_Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ROUTE_Validation": {
+      "main": [
+        [
+          {
+            "node": "PREPARE_GeminiPrompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "FORMAT_ErrorOutput",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARE_GeminiPrompt": {
+      "main": [
+        [
+          {
+            "node": "RESEARCH_Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RESEARCH_Gemini": {
+      "main": [
+        [
+          {
+            "node": "STRUCTURE_Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "STRUCTURE_Research": {
+      "main": [
+        [
+          {
+            "node": "PREPARE_ClaudePrompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARE_ClaudePrompt": {
+      "main": [
+        [
+          {
+            "node": "ANALYZE_Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ANALYZE_Claude": {
+      "main": [
+        [
+          {
+            "node": "FORMAT_Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timezone": "Asia/Kolkata",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [],
+  "id": "vhProspectInt001"
+}
