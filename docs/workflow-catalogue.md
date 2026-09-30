@@ -68,13 +68,15 @@ This catalogue tracks all n8n workflows managed within the VenturelyHub Marketin
   9. Direct Caller Response: Returns complete structured intelligence JSON payload directly to the HTTP caller
 - **Dependencies:**
   - Standalone pipeline; no external workflow dependencies
-- **Credential Requirements:**
-  - Google Gemini API (`googlePalmApi`)
-  - Anthropic API (`anthropicApi`)
-  - Google Sheets OAuth2 API (`googleSheetsOAuth2Api`) — Target account: `srisaikirantambalkar@gmail.com`
+- **Credential Requirements & Verification Status:**
+  - Google Gemini API (`googlePalmApi`): Credential ID `9pUlYyCqAwOgAvb8` (`tiwarivivek102006@gmail.com`) — `AUTHENTICATION_VERIFIED`
+  - Google Sheets OAuth2 API (`googleSheetsOAuth2Api`): Credential ID `JQRGvtvkfjEPF9WK` (`srisaikirantambalkar@gmail.com`) — `AUTHENTICATION_VERIFIED`
+  - Anthropic API (`anthropicApi`): Unset / pending in local runtime (`AUTHENTICATION_FAILED`; deterministic fallback active)
 - **Target Resources:**
   - Webhook endpoint: `/webhook/prospect-intelligence`
-  - Spreadsheet: `VenturelyHub` (Worksheets: `Prospect Intelligence Outputs`, `System Events`)
-- **Current Status:** Implemented, 100% node validation pass (15/15 functional nodes), 6 comprehensive test cases verified, synchronized with live local n8n runtime, safely inactive.
+  - Spreadsheet: `VenturelyHub` (ID: `15__ZAea7cXNS0U3sd-GzsTuZWSFMIgomM_EHPjUr5N4`)
+  - Target Worksheets: `Prospect Intelligence Outputs`, `System Events` (and 6 future phase worksheets)
+- **Current Status:** Implemented, 100% node validation pass, live runtime verified (Execution 3 success append & Execution 4 error append confirmed in Google Sheets), synchronized with live local n8n runtime, safely inactive.
+
 
 

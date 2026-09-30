@@ -114,11 +114,13 @@ Final Structured Response to Caller
 ```
 
 #### Key Operating Principles:
-1. **Direct Response Integrity:** Google Sheets append does **not** replace the direct workflow response. The webhook caller always receives the complete structured JSON response.
-2. **Full Raw JSON Preservation:** Every row appended to Google Sheets includes `raw_output_json` (or `raw_event_json` in `System Events`), ensuring zero data loss and enabling complete reconstructibility.
-3. **Resilient / Non-Blocking Execution:** Google Sheets append nodes are configured with `continueRegularOutput`. If Google OAuth credentials are unconfigured or temporarily unavailable, the execution completes gracefully and returns output to the caller.
-4. **Absolute CRM Rule Compliance:** The `VenturelyHub` spreadsheet is strictly an execution, output, and audit sink. It does NOT function as a customer database, lead database, deal pipeline, sales pipeline, or CRM.
-5. **Authentication Standard:** Intended account is `srisaikirantambalkar@gmail.com` authenticated via n8n's native Google Sheets OAuth2 (`googleSheetsOAuth2Api`). The email address is never hard-coded into workflow logic.
+1. **Direct Response Integrity:** Google Sheets operates as a persistent audit/output layer while the workflow continues to return the structured response to the caller. The webhook caller always receives the complete structured JSON response directly.
+2. **Synchronous Execution Model:** The Google Sheets append node executes within the active n8n execution pipeline between schema validation and final output response, providing verified persistence before response delivery.
+3. **Traceability & Idempotency Boundary:** `execution_id` provides unique execution-level traceability. The current append-only audit layer does not guarantee duplicate suppression across manual/replayed executions. No CRM-style entity deduplication is performed.
+4. **Full Raw JSON Preservation:** Every row appended to Google Sheets includes `raw_output_json` (or `raw_event_json` in `System Events`), ensuring zero data loss and enabling complete reconstructibility.
+5. **Resilient Non-Blocking Execution:** Google Sheets append nodes are configured with `continueRegularOutput`. If credentials or external APIs encounter transient network issues, the execution completes gracefully and returns output to the caller.
+6. **Absolute CRM Rule Compliance:** The `VenturelyHub` spreadsheet is strictly an execution, output, and audit sink. It does NOT function as a customer database, lead database, deal pipeline, sales pipeline, or CRM.
+7. **Authentication & Runtime Verification:** Authenticated via n8n's native Google Sheets OAuth2 (`googleSheetsOAuth2Api`) using `srisaikirantambalkar@gmail.com`. Connected to verified spreadsheet `VenturelyHub` (ID: `15__ZAea7cXNS0U3sd-GzsTuZWSFMIgomM_EHPjUr5N4`).
 
 ---
 
@@ -127,4 +129,5 @@ Final Structured Response to Caller
 1. **No Autonomous Outbound:** Automation creates structured intelligence, drafts, and recommendations. It never sends unreviewed external emails or commits commercial terms autonomously.
 2. **Execution State:** All production workflows remain **INACTIVE** in the n8n runtime until explicitly authorized.
 3. **Audit Trail:** Every workflow version and schema modification is version-controlled in Git and reconciled with the live local n8n runtime.
+
 

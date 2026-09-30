@@ -1,6 +1,5 @@
 {
   "name": "VenturelyHub Prospect Intelligence",
-  "id": "vhProspectInt001",
   "nodes": [
     {
       "parameters": {
@@ -15,7 +14,7 @@
       "typeVersion": 1,
       "position": [
         160,
-        60
+        64
       ]
     },
     {
@@ -30,8 +29,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        200,
-        360
+        208,
+        368
       ],
       "webhookId": "vh-prospect-intelligence-webhook-001"
     },
@@ -44,8 +43,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        460,
-        360
+        464,
+        368
       ]
     },
     {
@@ -78,7 +77,7 @@
       "typeVersion": 2.2,
       "position": [
         720,
-        360
+        368
       ]
     },
     {
@@ -93,8 +92,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        980,
-        100
+        992,
+        112
       ]
     },
     {
@@ -106,24 +105,23 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        980,
-        360
+        992,
+        368
       ]
     },
     {
       "parameters": {
-        "resource": "text",
-        "operation": "message",
         "modelId": {
           "__rl": true,
           "mode": "list",
-          "value": "models/gemini-2.5-flash"
+          "value": "models/gemini-flash-latest",
+          "cachedResultName": "models/gemini-2.5-flash",
+          "cachedResultUrl": ""
         },
         "messages": {
           "values": [
             {
-              "content": "={{ $json.gemini_prompt }}",
-              "role": "user"
+              "content": "={{ $json.gemini_prompt }}"
             }
           ]
         },
@@ -141,28 +139,28 @@
       "type": "@n8n/n8n-nodes-langchain.googleGemini",
       "typeVersion": 1.2,
       "position": [
-        1240,
-        360
+        1248,
+        368
       ],
+      "onError": "continueRegularOutput",
       "credentials": {
         "googlePalmApi": {
-          "id": "vh_google_gemini_api",
-          "name": "Google Gemini account"
+          "id": "9pUlYyCqAwOgAvb8",
+          "name": "Google Gemini(PaLM) Api account"
         }
-      },
-      "onError": "continueRegularOutput"
+      }
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nconst rawInput = item.input;\nconst today = new Date().toISOString().split('T')[0];\n\n// Handle Gemini response from langchain node or direct output\nlet geminiText = '';\nif (item.response && typeof item.response === 'string') {\n  geminiText = item.response;\n} else if (item.text && typeof item.text === 'string') {\n  geminiText = item.text;\n} else if (typeof item === 'string') {\n  geminiText = item;\n} else if (item.content && typeof item.content === 'string') {\n  geminiText = item.content;\n} else {\n  // If response is already an object\n  if (item.organization && item.description) {\n    return [{\n      json: {\n        input: rawInput,\n        test_fixture: item.test_fixture,\n        structured_research: item,\n        research_status: 'VERIFIED'\n      }\n    }];\n  }\n}\n\n// Extract JSON from potential markdown fences\nlet parsed = null;\nif (geminiText) {\n  try {\n    const jsonMatch = geminiText.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/) || [null, geminiText];\n    const cleanJson = (jsonMatch[1] || geminiText).trim();\n    parsed = JSON.parse(cleanJson);\n  } catch (e) {\n    parsed = null;\n  }\n}\n\n// Fallback if parsing fails or response was empty\nif (!parsed || typeof parsed !== 'object') {\n  parsed = {\n    organization: {\n      name: rawInput.organization_name,\n      website: rawInput.website || 'Not publicly verified',\n      type: rawInput.organization_type || 'Unknown',\n      location: rawInput.location || 'Not publicly verified'\n    },\n    description: 'Limited public information could be verified for this organization.',\n    focus_areas: [],\n    industries: [],\n    programs: [],\n    technology_focus: [],\n    relevant_activities: [],\n    partnership_signals: [],\n    relevant_contact_roles: ['Relevant contact not publicly verified'],\n    sources: rawInput.website && rawInput.website !== 'Not provided' ? [rawInput.website] : [],\n    research_date: today\n  };\n}\n\n// Ensure all schema fields exist defensively\nconst structuredResearch = {\n  organization: {\n    name: parsed.organization?.name || rawInput.organization_name,\n    website: parsed.organization?.website || rawInput.website || 'Not publicly verified',\n    type: parsed.organization?.type || rawInput.organization_type || 'Not publicly verified',\n    location: parsed.organization?.location || rawInput.location || 'Not publicly verified'\n  },\n  description: parsed.description || 'Limited public information could be verified for this organization.',\n  focus_areas: Array.isArray(parsed.focus_areas) ? parsed.focus_areas : [],\n  industries: Array.isArray(parsed.industries) ? parsed.industries : [],\n  programs: Array.isArray(parsed.programs) ? parsed.programs : [],\n  technology_focus: Array.isArray(parsed.technology_focus) ? parsed.technology_focus : [],\n  relevant_activities: Array.isArray(parsed.relevant_activities) ? parsed.relevant_activities : [],\n  partnership_signals: Array.isArray(parsed.partnership_signals) ? parsed.partnership_signals : [],\n  relevant_contact_roles: Array.isArray(parsed.relevant_contact_roles) && parsed.relevant_contact_roles.length > 0 \n    ? parsed.relevant_contact_roles \n    : ['Relevant contact not publicly verified'],\n  sources: Array.isArray(parsed.sources) ? parsed.sources : [],\n  research_date: parsed.research_date || today\n};\n\nconst desc = structuredResearch.description || '';\nconst isFallbackDesc = desc.toLowerCase().includes('limited public information') || desc.toLowerCase().includes('public description not found');\nconst hasSubstantialData = (!isFallbackDesc) && (structuredResearch.focus_areas.length > 0 || structuredResearch.programs.length > 0 || desc.length > 50);\n\nreturn [{\n  json: {\n    input: rawInput,\n    test_fixture: item.test_fixture,\n    structured_research: structuredResearch,\n    research_status: hasSubstantialData ? 'VERIFIED' : 'INSUFFICIENT_DATA'\n  }\n}];"
+        "jsCode": "const item = $input.first().json;\nconst valNode = $('VALIDATE_Input').first().json;\nconst rawInput = item.input || valNode.input || {};\nconst isSynthetic = item.test_fixture ?? valNode.test_fixture ?? false;\nconst today = new Date().toISOString().split('T')[0];\n\n// Handle Gemini response from langchain node or direct output\nlet geminiText = '';\nif (item.response && typeof item.response === 'string') {\n  geminiText = item.response;\n} else if (item.text && typeof item.text === 'string') {\n  geminiText = item.text;\n} else if (typeof item === 'string') {\n  geminiText = item;\n} else if (item.content && typeof item.content === 'string') {\n  geminiText = item.content;\n} else {\n  // If response is already an object\n  if (item.organization && item.description) {\n    return [{\n      json: {\n        input: rawInput,\n        test_fixture: isSynthetic,\n        structured_research: item,\n        research_status: 'VERIFIED'\n      }\n    }];\n  }\n}\n\n// Extract JSON from potential markdown fences\nlet parsed = null;\nif (geminiText) {\n  try {\n    const jsonMatch = geminiText.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/) || [null, geminiText];\n    const cleanJson = (jsonMatch[1] || geminiText).trim();\n    parsed = JSON.parse(cleanJson);\n  } catch (e) {\n    parsed = null;\n  }\n}\n\n// Fallback if parsing fails or response was empty/error\nif (!parsed || typeof parsed !== 'object') {\n  parsed = {\n    organization: {\n      name: rawInput.organization_name || 'Not provided',\n      website: rawInput.website || 'Not publicly verified',\n      type: rawInput.organization_type || 'Unknown',\n      location: rawInput.location || 'Not publicly verified'\n    },\n    description: 'Limited public information could be verified for this organization.',\n    focus_areas: [],\n    industries: [],\n    programs: [],\n    technology_focus: [],\n    relevant_activities: [],\n    partnership_signals: [],\n    relevant_contact_roles: ['Relevant contact not publicly verified'],\n    sources: rawInput.website && rawInput.website !== 'Not provided' ? [rawInput.website] : [],\n    research_date: today\n  };\n}\n\n// Ensure all schema fields exist defensively\nconst structuredResearch = {\n  organization: {\n    name: parsed.organization?.name || rawInput.organization_name || 'Not provided',\n    website: parsed.organization?.website || rawInput.website || 'Not publicly verified',\n    type: parsed.organization?.type || rawInput.organization_type || 'Not publicly verified',\n    location: parsed.organization?.location || rawInput.location || 'Not publicly verified'\n  },\n  description: parsed.description || 'Limited public information could be verified for this organization.',\n  focus_areas: Array.isArray(parsed.focus_areas) ? parsed.focus_areas : [],\n  industries: Array.isArray(parsed.industries) ? parsed.industries : [],\n  programs: Array.isArray(parsed.programs) ? parsed.programs : [],\n  technology_focus: Array.isArray(parsed.technology_focus) ? parsed.technology_focus : [],\n  relevant_activities: Array.isArray(parsed.relevant_activities) ? parsed.relevant_activities : [],\n  partnership_signals: Array.isArray(parsed.partnership_signals) ? parsed.partnership_signals : [],\n  relevant_contact_roles: Array.isArray(parsed.relevant_contact_roles) && parsed.relevant_contact_roles.length > 0 \n    ? parsed.relevant_contact_roles \n    : ['Relevant contact not publicly verified'],\n  sources: Array.isArray(parsed.sources) ? parsed.sources : [],\n  research_date: parsed.research_date || today\n};\n\nconst desc = structuredResearch.description || '';\nconst isFallbackDesc = desc.toLowerCase().includes('limited public information') || desc.toLowerCase().includes('public description not found');\nconst hasSubstantialData = (!isFallbackDesc) && (structuredResearch.focus_areas.length > 0 || structuredResearch.programs.length > 0 || desc.length > 50);\n\nreturn [{\n  json: {\n    input: rawInput,\n    test_fixture: isSynthetic,\n    structured_research: structuredResearch,\n    research_status: hasSubstantialData ? 'VERIFIED' : 'INSUFFICIENT_DATA'\n  }\n}];"
       },
       "id": "node-struct-research-001",
       "name": "STRUCTURE_Research",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1500,
-        360
+        1504,
+        368
       ]
     },
     {
@@ -178,7 +176,7 @@
       "typeVersion": 1,
       "position": [
         1760,
-        100
+        112
       ]
     },
     {
@@ -191,13 +189,11 @@
       "typeVersion": 2,
       "position": [
         1760,
-        360
+        368
       ]
     },
     {
       "parameters": {
-        "resource": "text",
-        "operation": "message",
         "modelId": {
           "__rl": true,
           "mode": "list",
@@ -206,30 +202,27 @@
         "messages": {
           "values": [
             {
-              "content": "={{ $json.claude_prompt }}",
-              "role": "user"
+              "content": "={{ $json.claude_prompt }}"
             }
           ]
         },
-        "options": {
-          "systemMessage": "You are a senior B2B sales strategist for VenturelyHub. Ground all analysis in the provided factual research. Return valid JSON only."
-        }
+        "options": {}
       },
       "id": "node-claude-analysis-001",
       "name": "ANALYZE_Claude",
       "type": "@n8n/n8n-nodes-langchain.anthropic",
       "typeVersion": 1,
       "position": [
-        2020,
-        360
+        2032,
+        368
       ],
+      "onError": "continueRegularOutput",
       "credentials": {
         "anthropicApi": {
           "id": "vh_anthropic_api",
           "name": "Anthropic account"
         }
-      },
-      "onError": "continueRegularOutput"
+      }
     },
     {
       "parameters": {
@@ -243,21 +236,21 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        2280,
-        100
+        2288,
+        112
       ]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nconst res = item.structured_research;\nconst rawInput = item.input;\nconst today = new Date().toISOString();\n\nlet claudeText = '';\nif (item.response && typeof item.response === 'string') {\n  claudeText = item.response;\n} else if (item.text && typeof item.text === 'string') {\n  claudeText = item.text;\n} else if (typeof item === 'string') {\n  claudeText = item;\n} else if (item.content && typeof item.content === 'string') {\n  claudeText = item.content;\n}\n\nlet analysis = null;\nif (claudeText) {\n  try {\n    const jsonMatch = claudeText.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/) || [null, claudeText];\n    const cleanJson = (jsonMatch[1] || claudeText).trim();\n    analysis = JSON.parse(cleanJson);\n  } catch (e) {\n    analysis = null;\n  }\n}\n\n// Fallback if Claude node was simulated or response was raw\nif (!analysis || typeof analysis !== 'object') {\n  const isInsuff = item.research_status === 'INSUFFICIENT_DATA';\n  analysis = {\n    fit_level: isInsuff ? 'INSUFFICIENT_DATA' : 'MEDIUM',\n    fit_reasons: isInsuff \n      ? ['Insufficient public information available to verify commercial technology fit.']\n      : ['Analysis generated based on available verified public profile data.'],\n    relevant_services: isInsuff ? [] : ['Product Engineering', 'AI Development', 'Cloud Architecture'],\n    recommended_offer: isInsuff ? 'Preliminary Discovery / Qualification' : 'Exploratory Technology Capabilities Consultation',\n    value_proposition: isInsuff \n      ? 'Pending further direct discovery with organization leadership.'\n      : `Supporting ${res.organization.name} with dedicated software engineering and AI capabilities.`,\n    personalization_angle: isInsuff\n      ? 'Requesting initial discussion on their current technology objectives and roadmap.'\n      : `Focus on their activities in ${res.focus_areas.join(', ') || 'technology innovation'}.`,\n    recommended_contact_role: res.relevant_contact_roles[0] || 'Relevant contact not publicly verified.',\n    suggested_cta: isInsuff\n      ? 'Introductory query to establish correct point of contact.'\n      : 'Invite for a brief 15-minute technology alignment conversation.',\n    potential_objections: isInsuff \n      ? ['Unknown project requirements or operational scale']\n      : ['Existing internal tech team or development partners', 'Budget allocation'],\n    confidence: isInsuff ? 'LOW' : 'MEDIUM'\n  };\n}\n\n// Construct standard final output object per contract\nconst finalOutput = {\n  prospect_profile: {\n    organization_name: res.organization.name,\n    website: res.organization.website,\n    type: res.organization.type,\n    location: res.organization.location,\n    description: res.description,\n    focus_areas: res.focus_areas,\n    industries: res.industries,\n    programs: res.programs,\n    technology_focus: res.technology_focus\n  },\n  research: {\n    relevant_activities: res.relevant_activities,\n    partnership_signals: res.partnership_signals,\n    relevant_contact_roles: res.relevant_contact_roles,\n    sources: res.sources,\n    research_date: res.research_date\n  },\n  venturelyhub_analysis: {\n    fit_level: analysis.fit_level || 'MEDIUM',\n    fit_reasons: Array.isArray(analysis.fit_reasons) ? analysis.fit_reasons : [String(analysis.fit_reasons)],\n    relevant_services: Array.isArray(analysis.relevant_services) ? analysis.relevant_services : [],\n    recommended_offer: analysis.recommended_offer || 'Technology Partnership Discussion',\n    value_proposition: analysis.value_proposition || '',\n    personalization_angle: analysis.personalization_angle || '',\n    recommended_contact_role: analysis.recommended_contact_role || 'Relevant contact not publicly verified.',\n    suggested_cta: analysis.suggested_cta || '',\n    potential_objections: Array.isArray(analysis.potential_objections) ? analysis.potential_objections : [],\n    confidence: analysis.confidence || 'MEDIUM'\n  },\n  metadata: {\n    workflow_name: 'VenturelyHub Prospect Intelligence',\n    processed_at: today,\n    status: 'SUCCESS',\n    test_fixture: Boolean(item.test_fixture)\n  }\n};\n\nreturn [{ json: finalOutput }];"
+        "jsCode": "const item = $input.first().json;\nconst structNode = $('STRUCTURE_Research').first().json;\nconst valNode = $('VALIDATE_Input').first().json;\nconst res = item.structured_research || structNode.structured_research;\nconst rawInput = item.input || valNode.input;\nconst isTestFixture = item.test_fixture ?? structNode.test_fixture ?? valNode.test_fixture;\nconst today = new Date().toISOString();\n\nlet claudeText = '';\nif (item.response && typeof item.response === 'string') {\n  claudeText = item.response;\n} else if (item.text && typeof item.text === 'string') {\n  claudeText = item.text;\n} else if (typeof item === 'string') {\n  claudeText = item;\n} else if (item.content && typeof item.content === 'string') {\n  claudeText = item.content;\n}\n\nlet analysis = null;\nif (claudeText) {\n  try {\n    const jsonMatch = claudeText.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/) || [null, claudeText];\n    const cleanJson = (jsonMatch[1] || claudeText).trim();\n    analysis = JSON.parse(cleanJson);\n  } catch (e) {\n    analysis = null;\n  }\n}\n\n// Fallback if Claude node was simulated or response was raw\nif (!analysis || typeof analysis !== 'object') {\n  const isInsuff = structNode.research_status === 'INSUFFICIENT_DATA';\n  analysis = {\n    fit_level: isInsuff ? 'INSUFFICIENT_DATA' : 'MEDIUM',\n    fit_reasons: isInsuff \n      ? ['Insufficient public information available to verify commercial technology fit.']\n      : ['Analysis generated based on available verified public profile data.'],\n    relevant_services: isInsuff ? [] : ['Product Engineering', 'AI Development', 'Cloud Architecture'],\n    recommended_offer: isInsuff ? 'Preliminary Discovery / Qualification' : 'Exploratory Technology Capabilities Consultation',\n    value_proposition: isInsuff \n      ? 'Pending further direct discovery with organization leadership.'\n      : `Supporting ${res.organization.name} with dedicated software engineering and AI capabilities.`,\n    personalization_angle: isInsuff\n      ? 'Requesting initial discussion on their current technology objectives and roadmap.'\n      : `Focus on their activities in ${res.focus_areas.join(', ') || 'technology innovation'}.`,\n    recommended_contact_role: res.relevant_contact_roles[0] || 'Relevant contact not publicly verified.',\n    suggested_cta: isInsuff\n      ? 'Introductory query to establish correct point of contact.'\n      : 'Invite for a brief 15-minute technology alignment conversation.',\n    potential_objections: isInsuff \n      ? ['Unknown project requirements or operational scale']\n      : ['Existing internal tech team or development partners', 'Budget allocation'],\n    confidence: isInsuff ? 'LOW' : 'MEDIUM'\n  };\n}\n\n// Construct standard final output object per contract\nconst finalOutput = {\n  prospect_profile: {\n    organization_name: res.organization.name,\n    website: res.organization.website,\n    type: res.organization.type,\n    location: res.organization.location,\n    description: res.description,\n    focus_areas: res.focus_areas,\n    industries: res.industries,\n    programs: res.programs,\n    technology_focus: res.technology_focus\n  },\n  research: {\n    relevant_activities: res.relevant_activities,\n    partnership_signals: res.partnership_signals,\n    relevant_contact_roles: res.relevant_contact_roles,\n    sources: res.sources,\n    research_date: res.research_date\n  },\n  venturelyhub_analysis: {\n    fit_level: analysis.fit_level || 'MEDIUM',\n    fit_reasons: Array.isArray(analysis.fit_reasons) ? analysis.fit_reasons : [String(analysis.fit_reasons)],\n    relevant_services: Array.isArray(analysis.relevant_services) ? analysis.relevant_services : [],\n    recommended_offer: analysis.recommended_offer || 'Technology Partnership Discussion',\n    value_proposition: analysis.value_proposition || '',\n    personalization_angle: analysis.personalization_angle || '',\n    recommended_contact_role: analysis.recommended_contact_role || 'Relevant contact not publicly verified.',\n    suggested_cta: analysis.suggested_cta || '',\n    potential_objections: Array.isArray(analysis.potential_objections) ? analysis.potential_objections : [],\n    confidence: analysis.confidence || 'MEDIUM'\n  },\n  metadata: {\n    workflow_name: 'VenturelyHub Prospect Intelligence',\n    processed_at: today,\n    status: 'SUCCESS',\n    test_fixture: Boolean(isTestFixture)\n  }\n};\n\nreturn [{ json: finalOutput }];"
       },
       "id": "node-format-output-001",
       "name": "FORMAT_Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2280,
-        360
+        2288,
+        368
       ]
     },
     {
@@ -269,16 +262,23 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2540,
-        360
+        2544,
+        368
       ]
     },
     {
       "parameters": {
-        "resource": "sheet",
         "operation": "append",
-        "documentId": "={{ 'VenturelyHub' }}",
-        "sheetName": "={{ 'Prospect Intelligence Outputs' }}",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "15__ZAea7cXNS0U3sd-GzsTuZWSFMIgomM_EHPjUr5N4"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Prospect Intelligence Outputs"
+        },
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
@@ -425,27 +425,27 @@
       "typeVersion": 4.5,
       "position": [
         2800,
-        360
+        368
       ],
+      "onError": "continueRegularOutput",
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "vh_google_sheets_oauth",
+          "id": "JQRGvtvkfjEPF9WK",
           "name": "Google Sheets account"
         }
-      },
-      "onError": "continueRegularOutput"
+      }
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{\n  json: item._original_output || item\n}];"
+        "jsCode": "const item = $input.first().json;\nconst original = item._original_output || $('FORMAT_Output').first().json;\nreturn [{\n  json: original\n}];"
       },
       "id": "node-return-output-001",
       "name": "RETURN_Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3060,
-        360
+        3072,
+        368
       ]
     },
     {
@@ -460,8 +460,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        980,
-        840
+        992,
+        848
       ]
     },
     {
@@ -473,16 +473,23 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        980,
-        620
+        992,
+        624
       ]
     },
     {
       "parameters": {
-        "resource": "sheet",
         "operation": "append",
-        "documentId": "={{ 'VenturelyHub' }}",
-        "sheetName": "={{ 'System Events' }}",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "15__ZAea7cXNS0U3sd-GzsTuZWSFMIgomM_EHPjUr5N4"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "System Events"
+        },
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
@@ -588,28 +595,28 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        1240,
-        620
+        1248,
+        624
       ],
+      "onError": "continueRegularOutput",
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "vh_google_sheets_oauth",
+          "id": "JQRGvtvkfjEPF9WK",
           "name": "Google Sheets account"
         }
-      },
-      "onError": "continueRegularOutput"
+      }
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{\n  json: item._original_error || item\n}];"
+        "jsCode": "const item = $input.first().json;\nconst original = item._original_error || $('FORMAT_ErrorOutput').first().json;\nreturn [{\n  json: original\n}];"
       },
       "id": "node-return-error-001",
       "name": "RETURN_ErrorOutput",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1500,
-        620
+        1504,
+        624
       ]
     }
   ],
@@ -776,7 +783,9 @@
     "availableInMCP": true
   },
   "meta": {
-    "templateCredsSetupCompleted": false
+    "templateCredsSetupCompleted": false,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
   },
   "tags": [],
   "id": "vhProspectInt001"
