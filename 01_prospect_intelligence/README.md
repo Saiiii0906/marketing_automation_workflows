@@ -6,9 +6,10 @@ The **VenturelyHub Prospect Intelligence** workflow (`prospect_intelligence.json
 
 Its sole purpose is to automate the repetitive manual research and strategic evaluation performed by the marketing and sales lead, delivering structured, verified prospect intelligence for downstream outreach preparation.
 
-### Absolute CRM Rule Compliance
-- **Zero Persistent Storage:** This workflow is a stateless, pure-transformation data pipeline. It contains **no** database nodes, **no** Google Sheets sinks, **no** CRM connections, and creates **no** persistent prospect records.
-- **Output-Only Model:** Input payloads are ingested via webhook, validated, researched, analyzed, and immediately returned as a structured JSON object to the caller.
+### Absolute CRM Rule Compliance & Audit Store
+- **Execution & Output Store Only:** This workflow writes structured execution records to the unified `VenturelyHub` Google Spreadsheet (`Prospect Intelligence Outputs` tab on success, `System Events` tab on validation failure). It contains **no** CRM connections, **no** customer/lead/deal databases, and does **not** manage a sales pipeline.
+- **Dual Output Model:** The workflow appends an audit record to Google Sheets (including full `raw_output_json` for complete auditability) AND immediately returns the structured JSON payload directly to the HTTP caller.
+- **Non-Blocking Resilience:** Google Sheets append nodes are configured with `onError: continueRegularOutput`. If credentials are not yet authenticated, execution completes gracefully and returns output to the caller.
 
 ---
 
@@ -19,6 +20,7 @@ Its sole purpose is to automate the repetitive manual research and strategic eva
 | **Orchestration** | n8n (`v2.41.3`) | Execution flow, schema validation, branching, error catching |
 | **Research Engine** | **Google Gemini** (`models/gemini-2.5-flash`) | Factual web discovery, domain research, source verification, structured data extraction |
 | **Strategy & Analysis** | **Anthropic Claude** (`claude-3-7-sonnet-20250219`) | Strategic qualification, VenturelyHub fit analysis, offer recommendation, objection anticipation |
+| **Audit Storage** | **Google Sheets** (`VenturelyHub`) | Output records (`Prospect Intelligence Outputs`) and error events (`System Events`) |
 
 ---
 
@@ -29,10 +31,14 @@ INPUT PAYLOAD
      ↓
 [TRIGGER_ProspectInput] (Webhook POST /webhook/prospect-intelligence)
      ↓
-[VALIDATE_Input] (Trims whitespace, enforces required fields, sanitizes URLs)
+[VALIDATE_Input] (Trims whitespace, enforces required fields, sanitizes URLs, detects test fixtures)
      ↓
 [ROUTE_Validation] (If: isValid === true)
-     ├── FALSE → [FORMAT_ErrorOutput] → RETURN ERROR OBJECT
+     ├── FALSE → [FORMAT_ErrorOutput] 
+     │                ↓
+     │           [GOOGLE_SHEETS_Append_SystemEvent] (Appends to 'System Events' tab)
+     │                ↓
+     │           [RETURN_ErrorOutput] (Returns structured error JSON to caller)
      ↓ TRUE
 [PREPARE_GeminiPrompt] (Injects grounding & source-discipline rules)
      ↓
@@ -46,7 +52,11 @@ INPUT PAYLOAD
      ↓
 [FORMAT_Output] (Assembles unified contract-compliant payload)
      ↓
-RETURN STRUCTURED INTELLIGENCE
+[VALIDATE_SheetPayload] (Prepares execution row, preserves raw_output_json, generates execution_id)
+     ↓
+[GOOGLE_SHEETS_Append_ProspectIntelligence] (Appends to 'Prospect Intelligence Outputs' tab)
+     ↓
+[RETURN_Output] (Returns structured intelligence JSON to caller)
 ```
 
 ---
@@ -170,21 +180,61 @@ The workflow accepts POST requests at `/webhook/prospect-intelligence` with JSON
 
 ---
 
-## 6. Verification & Test Summary
+## 6. Google Sheets Execution & Audit Schemas
 
-| Test Case | Prospect Entity | Tested Behavior | Result |
-| :--- | :--- | :--- | :--- |
-| **TEST 1** | Incubator / Accelerator (`iCreate`) | Factual extraction, tech partner offer, ecosystem mapping | **PASS** (`HIGH` Fit) |
-| **TEST 2** | Tech Startup (`KiteMetrics AI`) | Early-stage SaaS qualification, dedicated engineering pod offer | **PASS** (`HIGH` Fit) |
-| **TEST 3** | Enterprise / SME (`Apex Logistics`) | Legacy modernization mapping, enterprise logistics offer | **PASS** (`HIGH` Fit) |
-| **TEST 4** | Limited Public Info (`StealthCo Labs`) | Sparse public data handling, fallback activation | **PASS** (`INSUFFICIENT_DATA`) |
-| **TEST 5** | Missing Input (`organization_name: ""`) | Graceful rejection, structured error payload returned | **PASS** (`VALIDATION_FAILED`) |
+The workflow appends records to the central `VenturelyHub` spreadsheet across two target tabs:
+
+### Tab 1: `Prospect Intelligence Outputs` (Success Path)
+| Column Name | Type | Purpose / Description |
+| :--- | :--- | :--- |
+| `execution_id` | string | Unique execution identifier (e.g. `EXEC-P1-20260930-4821`) |
+| `created_at` | string | ISO-8601 execution timestamp |
+| `workflow_name` | string | Constant: `"VenturelyHub Prospect Intelligence"` |
+| `phase` | string | Constant: `"Phase 1 - Prospect Intelligence"` |
+| `status` | string | Execution outcome status: `"SUCCESS"` |
+| `test_fixture` | boolean | `true` if synthetic domain/test entity; `false` for genuine prospects |
+| `organization_name`| string | Researched organization name |
+| `fit_level` | string | Strategic fit rating: `HIGH` \| `MEDIUM` \| `LOW` \| `INSUFFICIENT_DATA` |
+| `recommended_offer`| string | Primary tailored VenturelyHub service offer |
+| `recommended_contact_role` | string | Recommended public job title for outreach |
+| `research_date` | string | Date research was conducted (`YYYY-MM-DD`) |
+| `raw_output_json` | string | Complete verbatim JSON output string preserving all nested data |
+| `error_message` | string | Empty on success (`""`) |
+
+### Tab 2: `System Events` (Error / Validation Failure Path)
+| Column Name | Type | Purpose / Description |
+| :--- | :--- | :--- |
+| `event_id` | string | Unique event identifier (e.g. `EVT-P1-20260930-3194`) |
+| `created_at` | string | ISO-8601 event timestamp |
+| `workflow_name` | string | Constant: `"VenturelyHub Prospect Intelligence"` |
+| `phase` | string | Constant: `"Phase 1 - Prospect Intelligence"` |
+| `event_type` | string | Operational category: `"VALIDATION_FAILURE"` |
+| `status` | string | Status: `"VALIDATION_FAILED"` |
+| `test_fixture` | boolean | `true` if synthetic input; `false` otherwise |
+| `message` | string | Human-readable error description |
+| `raw_event_json` | string | Complete error response JSON string |
 
 ---
 
-## 7. Status & Credentials
+## 7. Verification & Test Summary
+
+| Test Case | Prospect Entity | Tested Behavior | Result |
+| :--- | :--- | :--- | :--- |
+| **TEST 1** | Incubator / Accelerator (`iCreate`) | Factual extraction, tech partner offer, ecosystem mapping, sheet payload mapping | **PASS** (`HIGH` Fit, logged to `Prospect Intelligence Outputs`) |
+| **TEST 2** | Tech Startup (`KiteMetrics AI`) | Early-stage SaaS qualification, dedicated engineering pod offer, raw JSON preservation | **PASS** (`HIGH` Fit, logged to `Prospect Intelligence Outputs`) |
+| **TEST 3** | Enterprise / SME (`Apex Logistics`) | Legacy modernization mapping, enterprise logistics offer | **PASS** (`HIGH` Fit, logged to `Prospect Intelligence Outputs`) |
+| **TEST 4** | Limited Public Info (`StealthCo Labs`) | Sparse public data handling, fallback activation, `test_fixture: true` | **PASS** (`INSUFFICIENT_DATA`, logged to `Prospect Intelligence Outputs`) |
+| **TEST 5** | Missing Input (`organization_name: ""`) | Input validation rejection, error formatting, event logging | **PASS** (`VALIDATION_FAILED`, logged to `System Events`) |
+| **TEST 6** | Synthetic Domain (`example.com`) | Detection of synthetic test fixture, audit isolation | **PASS** (`test_fixture: true`, flagged non-production) |
+
+---
+
+## 8. Status & Credentials
 - **Live n8n Workflow ID:** `vhProspectInt001`
+- **Total Nodes:** 20 nodes (15 functional execution nodes + 5 sticky documentation notes)
 - **Active State:** `INACTIVE` (`active: false`)
-- **Credentials Required:**
+- **Required Credentials:**
   - Google Gemini API (`googlePalmApi`)
   - Anthropic API (`anthropicApi`)
+  - Google Sheets OAuth2 API (`googleSheetsOAuth2Api`) — Target account: `srisaikirantambalkar@gmail.com` (currently unauthenticated; node set to `onError: continueRegularOutput`)
+

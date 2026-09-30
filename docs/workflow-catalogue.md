@@ -55,19 +55,26 @@ This catalogue tracks all n8n workflows managed within the VenturelyHub Marketin
 - **Workflow Name:** `VenturelyHub Prospect Intelligence`
 - **Live n8n Workflow ID:** `vhProspectInt001`
 - **Active Status:** `INACTIVE` (`active: false`)
-- **Purpose:** Stateless prospect intelligence pipeline automating B2B prospect research and strategic qualification:
+- **Total Nodes:** 20 nodes (15 functional nodes + 5 sticky documentation notes)
+- **Purpose:** Stateless prospect intelligence pipeline automating B2B prospect research, strategic qualification, and execution audit logging:
   1. Trigger: `POST /webhook/prospect-intelligence`
-  2. Input Validation: Enforces required `organization_name`, sanitizes URLs and location
+  2. Input Validation: Enforces required `organization_name`, sanitizes URLs/location, identifies test fixtures
   3. Factual Research (Gemini): Uses Google Search and domain context to extract structured factual profile (programs, technologies, activities, public contact roles) with strict source citation
   4. Factual Structuring: Parses, validates research density, activates fallback if sparse
   5. Strategic Fit Analysis (Claude): Evaluates VenturelyHub relevance, fit level (`HIGH`, `MEDIUM`, `LOW`, `INSUFFICIENT_DATA`), maps matching services, recommends segment-specific offer, crafts value proposition, personalization angle, and anticipates objections
-  6. Output Formatting: Returns standardized payload directly to caller with zero persistent storage
+  6. Output Formatting: Assembles contract-compliant payload
+  7. Sheet Payload Preparation: Extracts flattened summary columns, preserves complete `raw_output_json`, assigns unique `execution_id`
+  8. Persistent Audit Append: Appends record to `VenturelyHub` Google Spreadsheet (`Prospect Intelligence Outputs` on success, `System Events` on validation failure) with non-blocking error handling (`continueRegularOutput`)
+  9. Direct Caller Response: Returns complete structured intelligence JSON payload directly to the HTTP caller
 - **Dependencies:**
   - Standalone pipeline; no external workflow dependencies
 - **Credential Requirements:**
   - Google Gemini API (`googlePalmApi`)
   - Anthropic API (`anthropicApi`)
+  - Google Sheets OAuth2 API (`googleSheetsOAuth2Api`) — Target account: `srisaikirantambalkar@gmail.com`
 - **Target Resources:**
   - Webhook endpoint: `/webhook/prospect-intelligence`
-- **Current Status:** Implemented, 100% node validation pass, 5 comprehensive test cases verified, synchronized with live local n8n runtime, safely inactive.
+  - Spreadsheet: `VenturelyHub` (Worksheets: `Prospect Intelligence Outputs`, `System Events`)
+- **Current Status:** Implemented, 100% node validation pass (15/15 functional nodes), 6 comprehensive test cases verified, synchronized with live local n8n runtime, safely inactive.
+
 

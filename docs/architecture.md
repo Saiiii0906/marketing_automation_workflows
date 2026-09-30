@@ -70,17 +70,61 @@ The system leverages specialized models to enforce a clear separation between **
 ### 3. Component Pipeline Architecture
 
 #### Phase 1: Prospect Intelligence Pipeline (`01_prospect_intelligence/`)
-- **Trigger Layer:** Webhook receiving target organization metadata.
-- **Validation Layer:** Enforces input hygiene and required organization name.
+- **Trigger Layer:** Webhook receiving target organization metadata (`POST /webhook/prospect-intelligence`).
+- **Validation Layer:** Enforces input hygiene, required organization name, and test fixture detection.
 - **Research Layer:** Gemini-powered search with built-in tools (`googleSearch`, `urlContext`).
 - **Structuring Layer:** Normalizes facts, verifies data density, triggers defensive fallbacks if information is sparse.
 - **Analysis Layer:** Claude-powered commercial fit analysis mapping against VenturelyHub core service domains.
-- **Output Layer:** Returns unified contract-compliant intelligence payload.
+- **Output Formatting Layer:** Constructs standard contract-compliant JSON payload.
+- **Audit Storage Layer:** Validates sheet payload and appends execution records to `VenturelyHub` spreadsheet (`Prospect Intelligence Outputs` on success, `System Events` on validation failure) with non-blocking error handling (`continueRegularOutput`).
+- **Direct Response Layer:** Returns complete structured intelligence payload directly to the caller.
 
 ---
 
-### 4. Safety & Human Governance Protocol
+### 4. Cross-Phase Google Sheets Execution & Output Audit Store
 
-1. **No Autonomous Outbound:** Automation creates structured intelligence and recommendations. It does not send unreviewed external emails or commit commercial terms.
+To provide persistent auditability, human inspection, and cross-phase pipeline coordination without violating the Absolute CRM Rule, all marketing automation phases append their execution outputs to a single centralized Google Spreadsheet:
+
+**Target Spreadsheet:** `VenturelyHub`
+
+#### Planned Target Worksheets:
+1. **`Prospect Intelligence Outputs`** — Structured outputs from Phase 1 (factual profile, strategic fit, recommended offers, raw JSON).
+2. **`Outbound Generation Outputs`** — Draft message variants, personalization angles, and approved messaging from Phase 2.
+3. **`Outreach Execution Outputs`** — Dispatch logs, send timestamps, message IDs, and channel routing from Phase 3.
+4. **`Reply Intelligence Outputs`** — Inbound sentiment analysis, intent categorization, and suggested replies from Phase 4.
+5. **`Meeting & Sales Assistance Outputs`** — Pre-call briefs, attendee dossiers, and discussion frameworks from Phase 5.
+6. **`Content Intelligence Outputs`** — Marketing content drafts, topic research, and social snippets from Phase 6.
+7. **`Performance Intelligence Outputs`** — Aggregated weekly/monthly campaign analytics and conversion telemetry from Phase 7.
+8. **`System Events`** — Cross-phase operational event log capturing validation failures, fallback invocations, and error events.
+
+#### Core Architectural Sequence Rule:
+Every phase workflow must follow the strict execution sequence:
+```
+Input
+  ↓
+Processing / Research / AI Analysis
+  ↓
+Structured Output Construction
+  ↓
+Output & Sheet Payload Validation
+  ↓
+Google Sheets Append (`VenturelyHub`)
+  ↓
+Final Structured Response to Caller
+```
+
+#### Key Operating Principles:
+1. **Direct Response Integrity:** Google Sheets append does **not** replace the direct workflow response. The webhook caller always receives the complete structured JSON response.
+2. **Full Raw JSON Preservation:** Every row appended to Google Sheets includes `raw_output_json` (or `raw_event_json` in `System Events`), ensuring zero data loss and enabling complete reconstructibility.
+3. **Resilient / Non-Blocking Execution:** Google Sheets append nodes are configured with `continueRegularOutput`. If Google OAuth credentials are unconfigured or temporarily unavailable, the execution completes gracefully and returns output to the caller.
+4. **Absolute CRM Rule Compliance:** The `VenturelyHub` spreadsheet is strictly an execution, output, and audit sink. It does NOT function as a customer database, lead database, deal pipeline, sales pipeline, or CRM.
+5. **Authentication Standard:** Intended account is `srisaikirantambalkar@gmail.com` authenticated via n8n's native Google Sheets OAuth2 (`googleSheetsOAuth2Api`). The email address is never hard-coded into workflow logic.
+
+---
+
+### 5. Safety & Human Governance Protocol
+
+1. **No Autonomous Outbound:** Automation creates structured intelligence, drafts, and recommendations. It never sends unreviewed external emails or commits commercial terms autonomously.
 2. **Execution State:** All production workflows remain **INACTIVE** in the n8n runtime until explicitly authorized.
-3. **Audit Trail:** Every workflow version and schema modification is version-controlled in Git and reconciled with the local n8n runtime.
+3. **Audit Trail:** Every workflow version and schema modification is version-controlled in Git and reconciled with the live local n8n runtime.
+
