@@ -15,7 +15,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        200,
+        208,
         80
       ]
     },
@@ -24,7 +24,6 @@
         "httpMethod": "POST",
         "path": "outreach-approval",
         "responseMode": "lastNode",
-        "responseData": "firstEntryJson",
         "options": {}
       },
       "id": "node-p3-trigger-001",
@@ -32,22 +31,22 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        220,
-        380
+        224,
+        384
       ],
       "webhookId": "vh-outreach-approval-webhook-001"
     },
     {
       "parameters": {
-        "jsCode": "// Pure JS deterministic hash (FNV-1a 64-bit variant formatted as hex)\nfunction fnv1a64Hex(str) {\n  let h1 = 0x811c9dc5;\n  let h2 = 0xcbf29ce4;\n  for (let i = 0; i < str.length; i++) {\n    const code = str.charCodeAt(i);\n    h1 ^= code;\n    h1 = Math.imul(h1, 0x01000193);\n    h2 ^= code;\n    h2 = Math.imul(h2, 0x000001b3);\n  }\n  const part1 = (h1 >>> 0).toString(16).padStart(8, '0');\n  const part2 = (h2 >>> 0).toString(16).padStart(8, '0');\n  return `h_${part1}${part2}`;\n}\n\nconst item = $input.first().json;\nconst body = item.body || item;\n\nconst approvalStatus = (body.approval_status || '').trim().toUpperCase();\nconst recipientEmail = (body.recipient_email || '').trim();\nconst recipientName = (body.recipient_name || '').trim();\nconst subject = (body.subject || '').trim();\nconst messageBody = (body.body || body.message_body || '').trim();\nconst sourceExecId = (body.source_execution_id || '').trim();\nconst orgName = (body.organization_name || '').trim();\nconst approvedBy = (body.approved_by || '').trim();\nconst claimsStatus = (body.claims_validation_status || '').trim().toUpperCase();\nconst providedHash = (body.approved_message_hash || '').trim();\nconst testMode = Boolean(body.test_mode);\nconst isTestFixture = Boolean(body.test_fixture);\nconst safeTestRecipient = (body.safe_test_recipient || '').trim().toLowerCase();\n\nlet isValid = true;\nlet errorCode = '';\nlet errorMessage = '';\n\n// 1. Mandatory Approval Decision\nif (approvalStatus !== 'APPROVED') {\n  isValid = false;\n  errorCode = approvalStatus === 'REJECTED' ? 'APPROVAL_REJECTED' : 'UNAPPROVED_DRAFT';\n  errorMessage = `Outreach dispatch blocked: draft is in '${approvalStatus || 'PENDING_REVIEW'}' status. Explicit 'APPROVED' status is required.`;\n}\n\n// 2. Mandatory Content & Recipient Checks\nelse if (!recipientEmail) {\n  isValid = false;\n  errorCode = 'MISSING_RECIPIENT_EMAIL';\n  errorMessage = 'Recipient email address is missing.';\n} else if (!subject) {\n  isValid = false;\n  errorCode = 'MISSING_SUBJECT';\n  errorMessage = 'Email subject line is missing.';\n} else if (!messageBody) {\n  isValid = false;\n  errorCode = 'MISSING_EMAIL_BODY';\n  errorMessage = 'Email message body is missing.';\n}\n\n// 3. Recipient Email Format & Anti-Injection Validation\nelse if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$/.test(recipientEmail)) {\n  isValid = false;\n  errorCode = 'INVALID_RECIPIENT_EMAIL';\n  errorMessage = `Recipient email '${recipientEmail}' is malformed or invalid.`;\n} else if (recipientEmail.includes(',') || recipientEmail.includes(';') || recipientEmail.includes('\\n') || recipientEmail.includes('\\r')) {\n  isValid = false;\n  errorCode = 'RECIPIENT_HEADER_INJECTION';\n  errorMessage = 'Recipient email contains forbidden delimiter or newline characters.';\n} else if (subject.includes('\\n') || subject.includes('\\r')) {\n  isValid = false;\n  errorCode = 'SUBJECT_HEADER_INJECTION';\n  errorMessage = 'Subject line contains forbidden newline characters.';\n}\n\n// 4. Claim Validation Integrity Check\nelse if (claimsStatus !== 'VERIFIED') {\n  isValid = false;\n  errorCode = 'CLAIMS_UNVERIFIED';\n  errorMessage = `Cannot dispatch message: claims_validation_status is '${claimsStatus || 'UNKNOWN'}'. Must be strictly 'VERIFIED'.`;\n}\n\n// 5. Test Mode & Test Fixture Safety Gate\nelse if (isTestFixture && !testMode) {\n  isValid = false;\n  errorCode = 'TEST_FIXTURE_BLOCKED';\n  errorMessage = 'Attempted to send outreach to a synthetic test fixture without test_mode=true. Blocked for production safety.';\n} else if (testMode && safeTestRecipient && recipientEmail.toLowerCase() !== safeTestRecipient) {\n  isValid = false;\n  errorCode = 'UNAUTHORIZED_TEST_RECIPIENT';\n  errorMessage = `In test_mode, emails may only be dispatched to the authorized safe test recipient '${safeTestRecipient}'. Attempted recipient: '${recipientEmail}'.`;\n}\n\n// 6. Cryptographic Approval Fingerprint / Hash Verification\nconst canonicalString = `${recipientEmail}|${subject}|${messageBody}|${sourceExecId}`;\nconst calculatedHash = fnv1a64Hex(canonicalString);\n\nif (isValid && providedHash && providedHash !== calculatedHash) {\n  isValid = false;\n  errorCode = 'APPROVAL_CONTENT_MISMATCH';\n  errorMessage = 'Cryptographic approval mismatch: Message content or recipient was modified after human approval authorization was issued.';\n}\n\nreturn [{\n  json: {\n    isValid,\n    errorCode,\n    errorMessage,\n    approval_status: approvalStatus,\n    recipient_email: recipientEmail,\n    recipient_name: recipientName,\n    organization_name: orgName,\n    subject,\n    message_body: messageBody,\n    source_execution_id: sourceExecId,\n    approved_by: approvedBy || 'authorized_human_reviewer',\n    approved_at: body.approved_at || new Date().toISOString(),\n    test_mode: testMode,\n    test_fixture: isTestFixture,\n    calculated_hash: calculatedHash,\n    raw_payload: body\n  }\n}];"
+        "jsCode": "// Pure JS deterministic hash (FNV-1a 64-bit variant formatted as hex)\nfunction fnv1a64Hex(str) {\n  let h1 = 0x811c9dc5;\n  let h2 = 0xcbf29ce4;\n  for (let i = 0; i < str.length; i++) {\n    const code = str.charCodeAt(i);\n    h1 ^= code;\n    h1 = Math.imul(h1, 0x01000193);\n    h2 ^= code;\n    h2 = Math.imul(h2, 0x000001b3);\n  }\n  const part1 = (h1 >>> 0).toString(16).padStart(8, '0');\n  const part2 = (h2 >>> 0).toString(16).padStart(8, '0');\n  return 'h_' + part1 + part2;\n}\n\nconst item = $input.first().json;\nconst body = item.body || item;\n\nconst approvalStatus = (body.approval_status || '').trim().toUpperCase();\nconst recipientEmail = (body.recipient_email || '').trim();\nconst recipientName = (body.recipient_name || '').trim();\nconst subject = (body.subject || '').trim();\nconst messageBody = (body.body || body.message_body || '').trim();\nconst sourceExecId = (body.source_execution_id || '').trim();\nconst orgName = (body.organization_name || '').trim();\nconst approvedBy = (body.approved_by || '').trim();\n\n// Normalize claims validation: support claims_validation_status (\"VERIFIED\") or claims_verified (true/false)\nlet claimsStatus = (body.claims_validation_status || '').trim().toUpperCase();\nif (!claimsStatus && body.claims_verified !== undefined) {\n  claimsStatus = body.claims_verified === true ? 'VERIFIED' : 'UNVERIFIED';\n}\n\nconst providedHash = (body.approved_message_hash || '').trim();\nconst testMode = Boolean(body.test_mode);\nconst isTestFixture = Boolean(body.test_fixture);\nconst safeTestRecipient = (body.safe_test_recipient || 'srisaikirantambalkar@gmail.com').trim().toLowerCase();\n\nlet isValid = true;\nlet errorCode = '';\nlet errorMessage = '';\n\n// 1. Mandatory Approval Decision\nif (approvalStatus !== 'APPROVED') {\n  isValid = false;\n  errorCode = approvalStatus === 'REJECTED' ? 'APPROVAL_REJECTED' : 'UNAPPROVED_DRAFT';\n  errorMessage = \"Outreach dispatch blocked: draft is in '\" + (approvalStatus || 'PENDING_REVIEW') + \"' status. Explicit 'APPROVED' status is required.\";\n}\n\n// 2. Mandatory Content & Recipient Checks\nelse if (!recipientEmail) {\n  isValid = false;\n  errorCode = 'MISSING_RECIPIENT_EMAIL';\n  errorMessage = 'Recipient email address is missing.';\n} else if (!subject) {\n  isValid = false;\n  errorCode = 'MISSING_SUBJECT';\n  errorMessage = 'Email subject line is missing.';\n} else if (!messageBody) {\n  isValid = false;\n  errorCode = 'MISSING_EMAIL_BODY';\n  errorMessage = 'Email message body is missing.';\n}\n\n// 3. Recipient Email Format & Anti-Injection Validation\nelse if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$/.test(recipientEmail)) {\n  isValid = false;\n  errorCode = 'INVALID_RECIPIENT_EMAIL';\n  errorMessage = \"Recipient email '\" + recipientEmail + \"' is malformed or invalid.\";\n} else if (recipientEmail.includes(',') || recipientEmail.includes(';') || recipientEmail.includes('\\n') || recipientEmail.includes('\\r')) {\n  isValid = false;\n  errorCode = 'RECIPIENT_HEADER_INJECTION';\n  errorMessage = 'Recipient email contains forbidden delimiter or newline characters.';\n} else if (subject.includes('\\n') || subject.includes('\\r')) {\n  isValid = false;\n  errorCode = 'SUBJECT_HEADER_INJECTION';\n  errorMessage = 'Subject line contains forbidden newline characters.';\n}\n\n// 4. Claim Validation Integrity Check\nelse if (claimsStatus !== 'VERIFIED') {\n  isValid = false;\n  errorCode = 'CLAIMS_UNVERIFIED';\n  errorMessage = \"Cannot dispatch message: claims validation status is '\" + (claimsStatus || 'UNKNOWN') + \"'. Must be strictly 'VERIFIED'.\";\n}\n\n// 5. Test Mode & Test Fixture Safety Gate\nelse if (isTestFixture && !testMode) {\n  isValid = false;\n  errorCode = 'TEST_FIXTURE_BLOCKED';\n  errorMessage = 'Attempted to send outreach to a synthetic test fixture without test_mode=true. Blocked for production safety.';\n} else if (testMode && safeTestRecipient && recipientEmail.toLowerCase() !== safeTestRecipient) {\n  isValid = false;\n  errorCode = 'UNAUTHORIZED_TEST_RECIPIENT';\n  errorMessage = \"In test_mode, emails may only be dispatched to the authorized safe test recipient '\" + safeTestRecipient + \"'. Attempted recipient: '\" + recipientEmail + \"'.\";\n}\n\n// 6. Cryptographic Approval Fingerprint / Hash Verification\nconst canonicalString = recipientEmail + '|' + subject + '|' + messageBody + '|' + sourceExecId;\nconst calculatedHash = fnv1a64Hex(canonicalString);\n\nif (isValid && providedHash && providedHash !== calculatedHash) {\n  isValid = false;\n  errorCode = 'APPROVAL_CONTENT_MISMATCH';\n  errorMessage = 'Cryptographic approval mismatch: Message content or recipient was modified after human approval authorization was issued.';\n}\n\nreturn [{\n  json: {\n    isValid,\n    errorCode,\n    errorMessage,\n    approval_status: approvalStatus,\n    recipient_email: recipientEmail,\n    recipient_name: recipientName,\n    organization_name: orgName,\n    subject,\n    message_body: messageBody,\n    source_execution_id: sourceExecId,\n    approved_by: approvedBy || 'authorized_human_reviewer',\n    approved_at: body.approved_at || new Date().toISOString(),\n    test_mode: testMode,\n    test_fixture: isTestFixture,\n    calculated_hash: calculatedHash,\n    raw_payload: body\n  }\n}];"
       },
       "id": "node-p3-val-approval-001",
       "name": "VALIDATE_ApprovalRequest",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        440,
-        380
+        448,
+        384
       ]
     },
     {
@@ -71,20 +70,21 @@
             }
           ],
           "combinator": "and"
-        }
+        },
+        "options": {}
       },
       "id": "node-p3-route-val-001",
       "name": "ROUTE_Validation",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        660,
-        380
+        672,
+        384
       ]
     },
     {
       "parameters": {
-        "jsCode": "// Persistent execution-level duplicate send protection\nconst item = $input.first().json;\nconst globalState = $getWorkflowStaticData('global');\n\nif (!globalState.sentExecutionIds) {\n  globalState.sentExecutionIds = [];\n}\n\nconst sendKey = `${item.source_execution_id || item.calculated_hash}-${item.recipient_email}`;\nconst alreadySent = globalState.sentExecutionIds.includes(sendKey);\n\nif (!alreadySent) {\n  globalState.sentExecutionIds.push(sendKey);\n}\n\nreturn [{\n  json: {\n    ...item,\n    already_sent: alreadySent,\n    send_key: sendKey\n  }\n}];"
+        "jsCode": "// Persistent execution-level duplicate send protection\n// Binds replay protection to exact approved execution and message fingerprint\nconst item = $input.first().json;\nconst globalState = $getWorkflowStaticData('global');\n\nif (!globalState.sentExecutionIds) {\n  globalState.sentExecutionIds = [];\n}\n\n// Tightened sendKey: binds source execution ID, cryptographic message fingerprint, and recipient\nconst sendKey = (item.source_execution_id || 'no_src') + '::' + item.calculated_hash + '::' + item.recipient_email;\nconst alreadySent = globalState.sentExecutionIds.includes(sendKey);\n\nif (!alreadySent) {\n  globalState.sentExecutionIds.push(sendKey);\n}\n\nreturn [{\n  json: {\n    ...item,\n    already_sent: alreadySent,\n    send_key: sendKey\n  }\n}];"
       },
       "id": "node-p3-check-dup-001",
       "name": "CHECK_AlreadySent",
@@ -92,7 +92,7 @@
       "typeVersion": 2,
       "position": [
         880,
-        260
+        272
       ]
     },
     {
@@ -116,15 +116,16 @@
             }
           ],
           "combinator": "and"
-        }
+        },
+        "options": {}
       },
       "id": "node-p3-route-dup-001",
       "name": "ROUTE_DuplicateCheck",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1100,
-        260
+        1104,
+        272
       ]
     },
     {
@@ -136,8 +137,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
-        380
+        1328,
+        384
       ]
     },
     {
@@ -152,8 +153,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1300,
-        80
+        1296,
+        -112
       ]
     },
     {
@@ -169,28 +170,29 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        1320,
-        180
+        1328,
+        192
       ],
+      "webhookId": "c39cd866-287d-45d3-942d-3f64df97ae39",
       "onError": "continueRegularOutput",
       "credentials": {
         "gmailOAuth2": {
-          "id": "gmailOAuth2Account",
+          "id": "Z5LunU63lEhN8WRL",
           "name": "Gmail account"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nconst checkNode = $('CHECK_AlreadySent').first().json;\n\nconst nowIso = new Date().toISOString();\nconst datePrefix = nowIso.split('T')[0].replace(/-/g, '');\nconst randomSuffix = Math.floor(1000 + Math.random() * 9000);\nconst executionId = `EXEC-P3-${datePrefix}-${randomSuffix}`;\n\n// Inspect whether Gmail returned an error or success\nlet sendStatus = 'SENT';\nlet messageId = item.id || item.messageId || `GMAIL-MOCK-${randomSuffix}`;\nlet errorMessage = '';\n\nif (item.error || item.statusCode >= 400 || (item.message && item.message.includes('credential'))) {\n  sendStatus = 'FAILED';\n  errorMessage = item.error?.message || item.message || 'Gmail dispatch error.';\n  messageId = '';\n} else {\n  // Record in static state to prevent re-sending\n  const globalState = $getWorkflowStaticData('global');\n  if (!globalState.sentExecutionIds) globalState.sentExecutionIds = [];\n  if (checkNode.send_key && !globalState.sentExecutionIds.includes(checkNode.send_key)) {\n    globalState.sentExecutionIds.push(checkNode.send_key);\n  }\n}\n\nconst finalResponse = {\n  execution_id: executionId,\n  created_at: nowIso,\n  workflow_name: 'VenturelyHub Outreach Approval & Execution',\n  phase: 'Phase 3 - Human Approval + Gmail Outreach Execution',\n  status: sendStatus,\n  send_status: sendStatus,\n  test_mode: Boolean(checkNode.test_mode),\n  test_fixture: Boolean(checkNode.test_fixture),\n  organization_name: checkNode.organization_name,\n  recipient_email: checkNode.recipient_email,\n  recipient_name: checkNode.recipient_name,\n  source_execution_id: checkNode.source_execution_id,\n  subject: checkNode.subject,\n  message_body: checkNode.message_body,\n  approval_status: checkNode.approval_status,\n  approved_by: checkNode.approved_by,\n  approved_at: checkNode.approved_at,\n  message_id: messageId,\n  sent_at: sendStatus === 'SENT' ? nowIso : '',\n  error_message: errorMessage,\n  approval_fingerprint: checkNode.calculated_hash\n};\n\n// Flattened row matching existing 'Outreach Execution Outputs' columns\nconst sheetRow = {\n  execution_id: executionId,\n  created_at: nowIso,\n  workflow_name: 'VenturelyHub Outreach Approval & Execution',\n  phase: 'Phase 3 - Outreach Execution',\n  status: sendStatus,\n  test_fixture: Boolean(checkNode.test_fixture),\n  recipient_identifier: checkNode.recipient_email,\n  channel: 'Email (Gmail)',\n  message_id: messageId,\n  sent_at: sendStatus === 'SENT' ? nowIso : '',\n  raw_output_json: JSON.stringify(finalResponse)\n};\n\nreturn [{\n  json: {\n    ...sheetRow,\n    _final_response: finalResponse\n  }\n}];"
+        "jsCode": "const item = $input.first().json;\nconst checkNode = $('CHECK_AlreadySent').first().json;\n\nconst nowIso = new Date().toISOString();\nconst datePrefix = nowIso.split('T')[0].replace(/-/g, '');\nconst randomSuffix = Math.floor(1000 + Math.random() * 9000);\nconst executionId = 'EXEC-P3-' + datePrefix + '-' + randomSuffix;\n\n// Inspect whether Gmail returned an error or success\nlet sendStatus = 'SENT';\nlet messageId = item.id || item.messageId || '';\nlet errorMessage = '';\n\nif (item.error || item.statusCode >= 400 || (item.message && item.message.includes('credential')) || !messageId) {\n  if (!messageId && !item.error) {\n    // If no provider messageId was returned, verify if item contains standard Gmail v1 message response\n    if (item.raw && item.raw.id) {\n      messageId = item.raw.id;\n    } else {\n      sendStatus = 'FAILED';\n      errorMessage = 'No Gmail provider message ID returned from dispatch.';\n    }\n  } else {\n    sendStatus = 'FAILED';\n    errorMessage = item.error?.message || item.message || 'Gmail dispatch error.';\n    messageId = '';\n  }\n}\n\nif (sendStatus === 'SENT') {\n  // Permanently record in static state to prevent re-sending\n  const globalState = $getWorkflowStaticData('global');\n  if (!globalState.sentExecutionIds) globalState.sentExecutionIds = [];\n  if (checkNode.send_key && !globalState.sentExecutionIds.includes(checkNode.send_key)) {\n    globalState.sentExecutionIds.push(checkNode.send_key);\n  }\n}\n\nconst finalResponse = {\n  execution_id: executionId,\n  created_at: nowIso,\n  workflow_name: 'VenturelyHub Outreach Approval & Execution',\n  phase: 'Phase 3 - Human Approval + Gmail Outreach Execution',\n  status: sendStatus,\n  send_status: sendStatus,\n  test_mode: Boolean(checkNode.test_mode),\n  test_fixture: Boolean(checkNode.test_fixture),\n  organization_name: checkNode.organization_name,\n  recipient_email: checkNode.recipient_email,\n  recipient_name: checkNode.recipient_name,\n  source_execution_id: checkNode.source_execution_id,\n  subject: checkNode.subject,\n  message_body: checkNode.message_body,\n  approval_status: checkNode.approval_status,\n  approved_by: checkNode.approved_by,\n  approved_at: checkNode.approved_at,\n  message_id: messageId,\n  sent_at: sendStatus === 'SENT' ? nowIso : '',\n  error_message: errorMessage,\n  approval_fingerprint: checkNode.calculated_hash\n};\n\n// Flattened row matching existing 'Outreach Execution Outputs' columns\nconst sheetRow = {\n  execution_id: executionId,\n  created_at: nowIso,\n  workflow_name: 'VenturelyHub Outreach Approval & Execution',\n  phase: 'Phase 3 - Outreach Execution',\n  status: sendStatus,\n  test_fixture: Boolean(checkNode.test_fixture),\n  recipient_identifier: checkNode.recipient_email,\n  channel: 'Email (Gmail)',\n  message_id: messageId,\n  sent_at: sendStatus === 'SENT' ? nowIso : '',\n  raw_output_json: JSON.stringify(finalResponse)\n};\n\nreturn [{\n  json: {\n    ...sheetRow,\n    _final_response: finalResponse\n  }\n}];"
       },
       "id": "node-p3-build-success-001",
       "name": "BUILD_SuccessAudit",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1540,
-        180
+        1552,
+        192
       ]
     },
     {
@@ -332,7 +334,7 @@
       "typeVersion": 4.5,
       "position": [
         1760,
-        180
+        192
       ],
       "onError": "continueRegularOutput",
       "credentials": {
@@ -351,8 +353,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1980,
-        180
+        1984,
+        192
       ]
     },
     {
@@ -365,7 +367,7 @@
       "typeVersion": 2,
       "position": [
         880,
-        500
+        512
       ]
     },
     {
@@ -486,8 +488,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        1100,
-        500
+        1104,
+        512
       ],
       "onError": "continueRegularOutput",
       "credentials": {
@@ -506,8 +508,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
-        500
+        1328,
+        512
       ]
     }
   ],
@@ -658,6 +660,6 @@
     "availableInMCP": true
   },
   "pinData": {},
-  "versionId": "05bba759-d88a-4135-97d9-7bf0e9bb1ba2",
+  "versionId": "0d664de9-e6aa-4efb-97e4-5ca2e01b1f63",
   "tags": []
 }

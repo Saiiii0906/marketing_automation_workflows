@@ -132,9 +132,9 @@ This catalogue tracks all n8n workflows managed within the VenturelyHub Marketin
   - Ingests approved draft packages produced by Phase 2 (`vhOutboundGen001`) with explicit human authorization.
 - **Credential Requirements & Verification Status:**
   - Google Sheets OAuth2 API (`googleSheetsOAuth2Api`): Credential ID `JQRGvtvkfjEPF9WK` (`srisaikirantambalkar@gmail.com`) — `AUTHENTICATION_VERIFIED`
-  - Gmail OAuth2 API (`gmailOAuth2`): Currently unconfigured in local n8n instance (`GMAIL_CREDENTIAL_REQUIRED`). Caught non-blockingly at runtime; logs execution attempt with `status = FAILED`.
+  - Gmail OAuth2 API (`gmailOAuth2`): Credential ID `Z5LunU63lEhN8WRL` (`srisaikirantambalkar@gmail.com`) — `AUTHENTICATION_VERIFIED`
 - **Target Resources:**
   - Webhook endpoint: `/webhook/outreach-execution`
   - Spreadsheet: `VenturelyHub` (ID: `15__ZAea7cXNS0U3sd-GzsTuZWSFMIgomM_EHPjUr5N4`)
   - Target Worksheets: `Outreach Execution Outputs`, `System Events`
-- **Current Status:** Implemented, 100% node validation pass, live runtime verified (Executions 20-31 across 10 verification test cases), synchronized with live local n8n runtime, safely inactive.
+- **Current Status:** Implemented, 100% node validation pass, live runtime verified in Phase 3.1 (Executions 32, 41 controlled sends with real Gmail provider message IDs; Executions 36, 42 replay blocks; Executions 37, 38, 39, 40 regression tests), synchronized with live local n8n runtime, safely inactive.

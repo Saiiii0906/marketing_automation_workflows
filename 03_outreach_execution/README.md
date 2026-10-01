@@ -172,23 +172,24 @@ The workflow was verified through comprehensive manual test executions in the li
 | :--- | :--- | :--- | :--- | :--- |
 | **Test 1** | Unapproved draft (`PENDING_REVIEW`) | Block send; return `UNAPPROVED_DRAFT`; log to System Events | `20` | **PASS** — Rejected at `ROUTE_Validation`; logged to System Events |
 | **Test 2** | Missing recipient email | Block send; return `MISSING_RECIPIENT_EMAIL`; log to System Events | `21` | **PASS** — Rejected at `ROUTE_Validation`; logged to System Events |
-| **Test 3** | Invalid email / header injection attempt | Block send; return `INVALID_RECIPIENT_EMAIL`; log to System Events | `22` | **PASS** — Header injection sanitized; rejection logged |
-| **Test 4** | Unverified claims (`claims_validation_status != VERIFIED`) | Block send; return `CLAIMS_UNVERIFIED`; log to System Events | `23` | **PASS** — Blocked; logged to System Events |
+| **Test 3** | Invalid email / header injection attempt | Block send; return `INVALID_RECIPIENT_EMAIL`; log to System Events | `22`, `39` | **PASS** — Header injection sanitized; rejection logged |
+| **Test 4** | Unverified claims (`claims_validation_status != VERIFIED` / `claims_verified = false`) | Block send; return `CLAIMS_UNVERIFIED`; log to System Events | `23`, `40` | **PASS** — Blocked; logged to System Events |
 | **Test 5** | Production email in test mode (`test_mode: true`) | Block send; return `UNAUTHORIZED_TEST_RECIPIENT`; log to System Events | `24` | **PASS** — Blocked prospect email in test mode; logged |
-| **Test 6** | Valid approval + Safe test recipient | Execute dispatch; log to Outreach Execution Outputs | `26` | **PASS** — Validated; reached Gmail node; logged to Outreach Execution Outputs (`EXEC-P3-20261001-9804`) |
-| **Test 7** | Duplicate send attempt (replay protection) | Detect existing `send_key`; block send; return `ALREADY_SENT` | `28`, `29` | **PASS** — Blocked at `ROUTE_DuplicateCheck`; logged to System Events |
-| **Test 8** | Content tampering after approval | Detect hash mismatch; block send; return `APPROVAL_CONTENT_MISMATCH` | `30` | **PASS** — Hash mismatch detected; logged to System Events |
+| **Test 6** | Valid approval + Safe test recipient | Execute dispatch; log to Outreach Execution Outputs | `26`, `32`, `41` | **PASS** — Validated; Gmail node executed successfully; provider message IDs returned (`1a0f8eef3102d853`, `1a0f8f48685f32fb`); logged to Outreach Execution Outputs (`EXEC-P3-20261001-3236`, `EXEC-P3-20261001-4351`) |
+| **Test 7** | Duplicate send attempt (replay protection) | Detect existing `send_key`; block send; return `ALREADY_SENT` | `28`, `36`, `42` | **PASS** — Blocked at `ROUTE_DuplicateCheck`; logged to System Events |
+| **Test 8** | Content tampering after approval | Detect hash mismatch; block send; return `APPROVAL_CONTENT_MISMATCH` | `30`, `38` | **PASS** — Hash mismatch detected; logged to System Events |
 | **Test 9** | Explicit rejection (`approval_status: REJECTED`) | Block send; return `APPROVAL_REJECTED`; log to System Events | `31` | **PASS** — Rejection caught cleanly; logged to System Events |
 | **Test 10** | Provider error handling (Missing Gmail Credential) | Intercept error non-blockingly; log `status: FAILED` | `26` | **PASS** — `onError: continueRegularOutput` caught error; status recorded |
 
 ---
 
-## 8. Credential & Environment Status
+## 8. Credential & Environment Status (Phase 3.1 Verified)
 
 - **n8n Workflow ID:** `vhOutboundExec001`
-- **Workflow State:** `active: false` (strictly enforced)
-- **Google Sheets Credential:** Configured & operational (ID: `JQRGvtvkfjEPF9WK`, Account: `srisaikirantambalkar@gmail.com`)
-- **Gmail OAuth Credential:** `GMAIL_CREDENTIAL_REQUIRED`
-  - The local n8n instance currently does not have an active Google OAuth2 Gmail credential connected.
-  - The workflow handles this gracefully via non-blocking error handling (`onError: continueRegularOutput`), recording `send_status: "FAILED"` with explicit notice `GMAIL_CREDENTIAL_REQUIRED`.
-  - Once the user authorizes Gmail OAuth in the n8n UI, production sending becomes active with zero code modifications.
+- **Workflow State:** `active: false` (strictly enforced; remains safely inactive until production deployment)
+- **Google Sheets Credential:** Configured & operational (ID: `JQRGvtvkfjEPF9WK`, Account: `srisaikirantambalkar@gmail.com`) — `AUTHENTICATION_VERIFIED`
+- **Gmail OAuth Credential:** Configured & operational (ID: `Z5LunU63lEhN8WRL`, Type: `gmailOAuth2`, Project: `SriSaiKiran srisaikirantambalkar@gmail.com`) — `AUTHENTICATION_VERIFIED`
+  - Live controlled email dispatch successfully verified against Google Gmail API.
+  - Returns real provider message IDs (`id: 1a0f8eef3102d853`, `id: 1a0f8f48685f32fb`) with labels `["UNREAD", "SENT", "INBOX"]`.
+  - Replay identity tightened to `source_execution_id::calculated_hash::recipient_email`.
+  - Zero secrets or OAuth tokens exposed.
