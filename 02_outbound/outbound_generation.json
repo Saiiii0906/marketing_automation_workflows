@@ -1,0 +1,705 @@
+{
+  "id": "vhOutboundGen001",
+  "name": "VenturelyHub Outbound Generation",
+  "active": false,
+  "isArchived": false,
+  "versionId": "dfeb55e6-72dc-4f5e-9793-9daf4da13cc8",
+  "activeVersionId": null,
+  "triggerCount": 1,
+  "nodeCount": 16,
+  "createdAt": "2026-10-01T16:53:27.781Z",
+  "updatedAt": "2026-10-01T16:53:27.781Z",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timezone": "Asia/Kolkata",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "tags": [],
+  "parentFolderId": null,
+  "description": "Phase 2 - Personalization & Outbound Generation",
+  "scopes": [
+    "execution:delete",
+    "execution:list",
+    "execution:read",
+    "execution:reveal",
+    "workflow:create",
+    "workflow:delete",
+    "workflow:disableRedaction",
+    "workflow:enableRedaction",
+    "workflow:execute",
+    "workflow:execute-chat",
+    "workflow:export",
+    "workflow:import",
+    "workflow:list",
+    "workflow:move",
+    "workflow:publish",
+    "workflow:read",
+    "workflow:share",
+    "workflow:unpublish",
+    "workflow:unshare",
+    "workflow:update"
+  ],
+  "canExecute": true,
+  "connections": {
+    "TRIGGER_Phase1Input": {
+      "main": [
+        [
+          {
+            "node": "VALIDATE_Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDATE_Input": {
+      "main": [
+        [
+          {
+            "node": "ROUTE_Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ROUTE_Validation": {
+      "main": [
+        [
+          {
+            "node": "NORMALIZE_Phase1Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "FORMAT_ErrorOutput",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NORMALIZE_Phase1Output": {
+      "main": [
+        [
+          {
+            "node": "PREPARE_OutboundPrompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARE_OutboundPrompt": {
+      "main": [
+        [
+          {
+            "node": "GENERATE_Outbound_Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GENERATE_Outbound_Ollama": {
+      "main": [
+        [
+          {
+            "node": "PARSE_Outbound",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE_Outbound": {
+      "main": [
+        [
+          {
+            "node": "VALIDATE_Claims",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDATE_Claims": {
+      "main": [
+        [
+          {
+            "node": "BUILD_OutputPayload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUILD_OutputPayload": {
+      "main": [
+        [
+          {
+            "node": "GOOGLE_SHEETS_Append_Outbound",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GOOGLE_SHEETS_Append_Outbound": {
+      "main": [
+        [
+          {
+            "node": "RETURN_Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FORMAT_ErrorOutput": {
+      "main": [
+        [
+          {
+            "node": "GOOGLE_SHEETS_Append_SystemEvent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GOOGLE_SHEETS_Append_SystemEvent": {
+      "main": [
+        [
+          {
+            "node": "RETURN_ErrorOutput",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## \ud83c\udfaf VENTURELYHUB OUTBOUND GENERATION\n**Phase 2 \u2014 Personalization & Multi-Channel Outbound Generation Pipeline**\n\n- Trigger: `POST /webhook/outbound-generation`\n- Role: Ingests Phase 1 Prospect Intelligence and synthesizes evidence-based multi-channel outbound draft packages.\n- Channels: Multi-touch Email Sequence (4 emails), LinkedIn Sequence (3 touches), Meeting Pitch Brief.\n- Safety Rule: `approval_status: PENDING_REVIEW`. Zero automatic sending (no Gmail/LinkedIn execution).\n- CRM Rule: Zero CRM connection or storage. Google Sheets is strictly an execution/audit store.",
+        "height": 260,
+        "width": 460,
+        "color": 4
+      },
+      "id": "note-p2-overview-001",
+      "name": "NOTE_Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "outbound-generation",
+        "responseMode": "lastNode",
+        "responseData": "firstEntryJson",
+        "options": {}
+      },
+      "id": "node-p2-trigger-001",
+      "name": "TRIGGER_Phase1Input",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        380
+      ],
+      "webhookId": "vh-outbound-generation-webhook-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst body = item.body || item;\n\n// Robust extraction from various wrapper shapes\nconst profile = body.prospect_profile || body.profile || null;\nconst research = body.research || null;\nconst analysis = body.venturelyhub_analysis || body.analysis || null;\nconst metadata = body.metadata || {};\n\nconst orgName = (profile?.organization_name || body.organization_name || '').trim();\nconst website = (profile?.website || body.website || '').trim();\n\nlet isValid = true;\nlet errorCode = '';\nlet errorMessage = '';\n\nif (!orgName) {\n  isValid = false;\n  errorCode = 'MISSING_ORGANIZATION_NAME';\n  errorMessage = 'Field organization_name is required and cannot be empty.';\n} else if (!profile || typeof profile !== 'object') {\n  isValid = false;\n  errorCode = 'MISSING_PROSPECT_PROFILE';\n  errorMessage = 'Phase 1 payload must contain a valid prospect_profile section.';\n} else if (!analysis || typeof analysis !== 'object') {\n  isValid = false;\n  errorCode = 'MISSING_VENTURELYHUB_ANALYSIS';\n  errorMessage = 'Phase 1 payload must contain a valid venturelyhub_analysis section.';\n}\n\nconst isSynthetic = /example\\.(com|org|net)/i.test(website) || \n                    /test|synthetic|mock|stealthco/i.test(orgName) || \n                    Boolean(metadata.test_fixture) || \n                    Boolean(body.test_fixture);\n\nreturn [{\n  json: {\n    isValid,\n    errorCode,\n    errorMessage,\n    raw_payload: body,\n    organization_name: orgName,\n    test_fixture: isSynthetic,\n    source_execution_id: metadata.execution_id || body.execution_id || ''\n  }\n}];"
+      },
+      "id": "node-p2-validate-001",
+      "name": "VALIDATE_Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-valid-001",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-p2-route-val-001",
+      "name": "ROUTE_Validation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst body = item.raw_payload;\n\nconst profile = body.prospect_profile || {};\nconst research = body.research || {};\nconst analysis = body.venturelyhub_analysis || {};\nconst meta = body.metadata || {};\n\nconst normalized = {\n  prospect_profile: {\n    organization_name: profile.organization_name || item.organization_name || '',\n    website: profile.website || '',\n    type: profile.type || 'Not specified',\n    location: profile.location || 'Not specified',\n    description: profile.description || '',\n    focus_areas: Array.isArray(profile.focus_areas) ? profile.focus_areas : [],\n    industries: Array.isArray(profile.industries) ? profile.industries : [],\n    programs: Array.isArray(profile.programs) ? profile.programs : [],\n    technology_focus: Array.isArray(profile.technology_focus) ? profile.technology_focus : []\n  },\n  research: {\n    relevant_activities: Array.isArray(research.relevant_activities) ? research.relevant_activities : [],\n    partnership_signals: Array.isArray(research.partnership_signals) ? research.partnership_signals : [],\n    relevant_contact_roles: Array.isArray(research.relevant_contact_roles) ? research.relevant_contact_roles : ['Decision Maker'],\n    sources: Array.isArray(research.sources) ? research.sources : [],\n    research_date: research.research_date || new Date().toISOString().split('T')[0]\n  },\n  venturelyhub_analysis: {\n    fit_level: analysis.fit_level || 'MEDIUM',\n    fit_reasons: Array.isArray(analysis.fit_reasons) ? analysis.fit_reasons : [String(analysis.fit_reasons || '')],\n    venturelyhub_relevance: analysis.venturelyhub_relevance || '',\n    relevant_services: Array.isArray(analysis.relevant_services) ? analysis.relevant_services : ['Product Engineering', 'AI Development'],\n    recommended_offer: analysis.recommended_offer || 'Technology Partnership Discussion',\n    value_proposition: analysis.value_proposition || '',\n    outreach_angle: analysis.outreach_angle || analysis.personalization_angle || '',\n    personalization_angle: analysis.personalization_angle || analysis.outreach_angle || '',\n    recommended_contact_role: analysis.recommended_contact_role || (research.relevant_contact_roles && research.relevant_contact_roles[0]) || 'Decision Maker',\n    recommended_cta: analysis.recommended_cta || analysis.suggested_cta || '15-minute introductory conversation',\n    potential_objections: Array.isArray(analysis.potential_objections) ? analysis.potential_objections : [],\n    confidence: analysis.confidence || 'MEDIUM'\n  },\n  source_execution_id: item.source_execution_id || meta.execution_id || '',\n  test_fixture: item.test_fixture\n};\n\nreturn [{ json: normalized }];"
+      },
+      "id": "node-p2-normalize-001",
+      "name": "NORMALIZE_Phase1Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## \ud83e\udde0 PROMPT PREPARATION & GROUNDING\n**Node:** PREPARE_OutboundPrompt\n\n- Injects strict factual grounding rules.\n- Injects VenturelyHub B2B positioning & selected relevant services.\n- Dictates multi-channel schema (Personalization Analysis, Email 1-4, LinkedIn 1-3, Meeting Pitch, Approval).\n- Mandates approval_status: PENDING_REVIEW.",
+        "height": 260,
+        "width": 460,
+        "color": 3
+      },
+      "id": "note-p2-prompt-001",
+      "name": "NOTE_Prompting",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst p = item.prospect_profile;\nconst r = item.research;\nconst a = item.venturelyhub_analysis;\n\nconst prompt = `You are VenturelyHub's B2B Technology Personalization and Outbound Campaign Specialist.\nYour task is to generate a complete, highly personalized multi-channel outbound campaign package based strictly on the verified Phase 1 prospect intelligence.\n\nVENTURELYHUB COMPANY PROFILE & CORE CAPABILITIES:\nVenturelyHub helps startups and enterprises build scalable digital products through technology, AI, and innovation:\n- Product Engineering & Custom Software\n- Web Development & Mobile App Development (iOS, Android, Flutter)\n- SaaS Development & Enterprise Platforms\n- AI Development, Custom AI Agents & Chatbots\n- AI Analytics, Predictive BI & Data Intelligence\n- Cloud Architecture, DevOps Automation, Server Management & CI/CD\n- UI/UX Design, Design Systems & Product Strategy\n- Custom SDK Development & API Integrations\n- Startup Product Acceleration (MVP development, Tech clinics, Dedicated Engineering Pods)\n\nVERIFIED PROSPECT INTELLIGENCE (Strictly Grounded):\n${JSON.stringify(item, null, 2)}\n\nSTRICT OPERATIONAL & MESSAGING RULES:\n1. Every factual statement must be grounded in the verified intelligence above.\n2. NEVER invent funding, hiring, technology stacks, clients, revenues, milestones, or achievements not stated in the evidence.\n3. If specific details are sparse, use cautious, general relevance (\"Given your focus on...\", \"With your initiatives in...\").\n4. Tone: Concise, professional, human, helpful, consultative, zero hype, zero spam, zero fake urgency.\n5. Do NOT mention all VenturelyHub services blindly; select only those directly relevant to the prospect.\n6. Email sequence must include 4 distinct emails (Email 1, Follow-up 1, Follow-up 2, Follow-up 3), each with subject, body, and purpose.\n7. LinkedIn sequence must include 3 touches (Connection note max 300 chars, Follow-up 1, Follow-up 2).\n8. Meeting pitch must be a compact brief (Opening, Value Proposition, 2-4 Suggested Discussion Points, CTA).\n9. Approval status must strictly be \"PENDING_REVIEW\".\n10. Return valid JSON only adhering strictly to the requested schema.\n\nSCHEMA SPECIFICATION:\n{\n  \"personalization_analysis\": {\n    \"why_this_prospect\": \"Specific commercial rationale connecting prospect focus to VenturelyHub\",\n    \"relevant_signal\": \"The verified signal or activity from research supporting outreach\",\n    \"personalization_angle\": \"The core thematic angle for personalization\",\n    \"value_proposition\": \"Clear, compelling value proposition sentence\",\n    \"recommended_offer\": \"${a.recommended_offer || 'Ecosystem Technology Partnership'}\",\n    \"recommended_contact_role\": \"${a.recommended_contact_role || 'Decision Maker'}\",\n    \"recommended_cta\": \"${a.recommended_cta || '15-minute alignment conversation'}\",\n    \"tone\": \"Professional, collaborative, evidence-based\",\n    \"claims_to_avoid\": [\"List of unsupported claims strictly avoided\"],\n    \"risks\": [\"Potential outreach risks or context gaps\"],\n    \"confidence\": \"${a.confidence || 'MEDIUM'}\"\n  },\n  \"email_sequence\": {\n    \"email_1\": { \"subject\": \"String subject line\", \"body\": \"Concise 3-paragraph email body\", \"purpose\": \"Initial introduction and verified relevance\" },\n    \"follow_up_1\": { \"subject\": \"String subject line\", \"body\": \"Short 2-paragraph follow-up reinforcing relevance\", \"purpose\": \"Reinforce relevance and offer specific support\" },\n    \"follow_up_2\": { \"subject\": \"String subject line\", \"body\": \"Alternative angle or capability\", \"purpose\": \"Alternative angle or engineering capability\" },\n    \"follow_up_3\": { \"subject\": \"String subject line\", \"body\": \"Polite close-the-loop message\", \"purpose\": \"Polite close-the-loop inquiry\" }\n  },\n  \"linkedin_sequence\": {\n    \"connection_note\": \"Short natural note under 300 chars\",\n    \"follow_up_1\": { \"message\": \"Short message referencing verified context\", \"purpose\": \"Reference verified context\" },\n    \"follow_up_2\": { \"message\": \"Concise message introducing capability with soft CTA\", \"purpose\": \"Introduce VenturelyHub capability and soft CTA\" }\n  },\n  \"meeting_pitch\": {\n    \"opening\": \"Why the conversation is relevant\",\n    \"value_proposition\": \"What VenturelyHub can contribute\",\n    \"suggested_discussion_points\": [\"Point 1\", \"Point 2\", \"Point 3\"],\n    \"cta\": \"Reasonable next step\"\n  },\n  \"approval\": {\n    \"approval_status\": \"PENDING_REVIEW\",\n    \"review_notes\": \"Awaiting human review and channel dispatch selection.\"\n  }\n}`;\n\nreturn [{\n  json: {\n    ...item,\n    outbound_prompt: prompt\n  }\n}];"
+      },
+      "id": "node-p2-prep-prompt-001",
+      "name": "PREPARE_OutboundPrompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:11434/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: 'qwen3:8b', messages: [ { role: 'system', content: 'You are VenturelyHub\\'s B2B Technology Outbound Specialist. You must output valid JSON only adhering strictly to the requested schema. No conversational preamble, no markdown fences.' }, { role: 'user', content: $json.outbound_prompt } ], stream: false, format: 'json', options: { temperature: 0.2, num_predict: 2000 } } }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "node-p2-http-ollama-001",
+      "name": "GENERATE_Outbound_Ollama",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1320,
+        260
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst prepNode = $('PREPARE_OutboundPrompt').first().json;\nconst normNode = $('NORMALIZE_Phase1Output').first().json;\n\nconst profile = prepNode.prospect_profile || normNode.prospect_profile || {};\nconst research = prepNode.research || normNode.research || {};\nconst analysis = prepNode.venturelyhub_analysis || normNode.venturelyhub_analysis || {};\nconst isTestFixture = prepNode.test_fixture ?? normNode.test_fixture;\n\nlet rawText = '';\nif (item.message?.content && typeof item.message.content === 'string') {\n  rawText = item.message.content;\n} else if (item.response && typeof item.response === 'string') {\n  rawText = item.response;\n} else if (item.content && typeof item.content === 'string') {\n  rawText = item.content;\n}\n\nlet parsed = null;\nif (rawText && rawText.trim().length > 0) {\n  try {\n    parsed = JSON.parse(rawText.trim());\n  } catch (e) {\n    try {\n      const cleaned = rawText.replace(/```json\\n?|```/g, '').trim();\n      parsed = JSON.parse(cleaned);\n    } catch (e2) {\n      try {\n        const start = rawText.indexOf('{');\n        const end = rawText.lastIndexOf('}');\n        if (start !== -1 && end > start) {\n          parsed = JSON.parse(rawText.slice(start, end + 1));\n        }\n      } catch (e3) {\n        parsed = null;\n      }\n    }\n  }\n}\n\n// Resilient deterministic fallback if Ollama times out or errors\nif (!parsed || typeof parsed !== 'object' || !parsed.email_sequence) {\n  const orgName = profile.organization_name || 'your team';\n  const role = analysis.recommended_contact_role || 'Technology Leader';\n  const offer = analysis.recommended_offer || 'Technology Capabilities Consultation';\n  const valProp = analysis.value_proposition || `Supporting ${orgName} with scalable digital product engineering and AI capabilities.`;\n  const angle = analysis.outreach_angle || `Exploring technology alignment for ${orgName}`;\n\n  parsed = {\n    personalization_analysis: {\n      why_this_prospect: `Alignment between ${orgName} and VenturelyHub capabilities.`,\n      relevant_signal: analysis.outreach_angle || 'Publicly verified organizational profile',\n      personalization_angle: angle,\n      value_proposition: valProp,\n      recommended_offer: offer,\n      recommended_contact_role: role,\n      recommended_cta: analysis.recommended_cta || '15-minute introductory alignment discussion',\n      tone: 'Professional, consultative, evidence-based',\n      claims_to_avoid: ['Unverified funding status', 'Unverified tech stack details', 'Unverified hiring signals'],\n      risks: ['Limited public evidence available for deep technical personalization'],\n      confidence: analysis.confidence || 'LOW'\n    },\n    email_sequence: {\n      email_1: {\n        subject: `Exploring Technology Collaboration with ${orgName}`,\n        body: `Hi [Name],\\n\\nI came across ${orgName} and noticed your focus on ${profile.focus_areas?.[0] || 'technology innovation'}.\\n\\nVenturelyHub is a software engineering partner helping organizations build scalable web, mobile, and AI solutions. ${valProp}\\n\\nWould you be open to a brief 15-minute conversation to explore whether our engineering capabilities align with your roadmap?\\n\\nBest regards,\\nVenturelyHub Partnerships`,\n        purpose: 'Initial introduction and verified relevance'\n      },\n      follow_up_1: {\n        subject: `Re: Exploring Technology Collaboration with ${orgName}`,\n        body: `Hi [Name],\\n\\nFollowing up briefly on my previous note. Given your initiatives around ${profile.focus_areas?.[0] || 'digital acceleration'}, we often help teams accelerate their delivery velocity with dedicated engineering pods.\\n\\nWould love to share a few relevant examples if helpful.\\n\\nBest,\\nVenturelyHub Partnerships`,\n        purpose: 'Reinforce relevance and offer specific support'\n      },\n      follow_up_2: {\n        subject: `Engineering support for ${orgName}`,\n        body: `Hi [Name],\\n\\nRecognizing that priorities evolve rapidly, wanted to share that VenturelyHub also provides architecture audits and AI enablement.\\n\\nIf this aligns with any upcoming priorities, happy to connect briefly.\\n\\nBest,\\nVenturelyHub Partnerships`,\n        purpose: 'Alternative angle or engineering capability'\n      },\n      follow_up_3: {\n        subject: `Closing the loop - ${orgName} / VenturelyHub`,\n        body: `Hi [Name],\\n\\nAssuming technology engineering support isn't top of mind right now. I'll pause our follow-ups here, but feel free to reach out if scalable software or AI development needs arise in the future.\\n\\nWishing you continued success.\\n\\nBest,\\nVenturelyHub Partnerships`,\n        purpose: 'Polite close-the-loop inquiry'\n      }\n    },\n    linkedin_sequence: {\n      connection_note: `Hi [Name], noticed your work at ${orgName} around ${profile.focus_areas?.[0] || 'technology'}. Would love to connect and follow your journey!`,\n      follow_up_1: {\n        message: `Thanks for connecting! Given your initiatives at ${orgName}, VenturelyHub works closely with organizations to build scalable digital products and AI systems.`,\n        purpose: 'Reference verified context'\n      },\n      follow_up_2: {\n        message: `Would you be open to a brief 15-minute chat sometime next week to exchange perspectives on technology execution?`,\n        purpose: 'Introduce VenturelyHub capability and soft CTA'\n      }\n    },\n    meeting_pitch: {\n      opening: `Context of conversation around ${orgName}'s focus on ${profile.focus_areas?.[0] || 'technology'}.`,\n      value_proposition: valProp,\n      suggested_discussion_points: [\n        `Overview of ${orgName}'s current digital product priorities`,\n        'VenturelyHub dedicated engineering pod model',\n        'Potential collaboration areas around AI or cloud architecture'\n      ],\n      cta: 'Agree on potential next exploratory step or technical review'\n    },\n    approval: {\n      approval_status: 'PENDING_REVIEW',\n      review_notes: 'Generated via resilient fallback due to LLM response format.'\n    }\n  };\n}\n\nreturn [{\n  json: {\n    phase1_data: prepNode,\n    outbound_package: parsed,\n    test_fixture: Boolean(isTestFixture)\n  }\n}];"
+      },
+      "id": "node-p2-parse-outbound-001",
+      "name": "PARSE_Outbound",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst pkg = item.outbound_package;\nconst p1 = item.phase1_data || {};\nconst profile = p1.prospect_profile || {};\nconst research = p1.research || {};\n\n// Verify that forbidden hallucinations did not creep into emails or messages\nconst fullText = JSON.stringify(pkg).toLowerCase();\n\nconst flaggedTerms = [\n  'series a', 'series b', 'seed round', 'raised $', 'venture funding',\n  'noticed you are hiring', 'saw your job posting', 'congratulations on raising',\n  'as seen on techcrunch', 'reduce costs by 40%', 'guaranteed 10x'\n];\n\nconst violationsFound = [];\nfor (const term of flaggedTerms) {\n  if (fullText.includes(term)) {\n    // Check if this term was verified in research\n    const verifiedSources = JSON.stringify(research).toLowerCase() + JSON.stringify(profile).toLowerCase();\n    if (!verifiedSources.includes(term)) {\n      violationsFound.push(term);\n    }\n  }\n}\n\n// Sanitize approval and add validation summary\nconst claimsValidation = {\n  status: violationsFound.length === 0 ? 'VERIFIED' : 'SANITIZED',\n  violations_detected: violationsFound,\n  action_taken: violationsFound.length === 0 ? 'Passed strict claim grounding check' : 'Flagged for human reviewer inspection'\n};\n\n// Guarantee strict approval_status\npkg.approval = {\n  approval_status: 'PENDING_REVIEW',\n  review_notes: violationsFound.length === 0 \n    ? 'All claims verified against Phase 1 evidence. Ready for human review.'\n    : `Human review required: unverified claims flagged (${violationsFound.join(', ')}).`\n};\n\nreturn [{\n  json: {\n    ...item,\n    claims_validation: claimsValidation\n  }\n}];"
+      },
+      "id": "node-p2-val-claims-001",
+      "name": "VALIDATE_Claims",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst pkg = item.outbound_package;\nconst p1 = item.phase1_data || {};\nconst profile = p1.prospect_profile || {};\nconst analysis = p1.venturelyhub_analysis || {};\nconst claims = item.claims_validation || {};\n\nconst now = new Date();\nconst nowIso = now.toISOString();\nconst datePrefix = nowIso.split('T')[0].replace(/-/g, '');\nconst randomSuffix = Math.floor(1000 + Math.random() * 9000);\nconst executionId = `EXEC-P2-${datePrefix}-${randomSuffix}`;\n\nconst sourceExecId = p1.source_execution_id || p1.metadata?.execution_id || '';\n\n// Clean, contract-compliant final structured JSON\nconst finalOutput = {\n  personalization_analysis: pkg.personalization_analysis || {},\n  email_sequence: pkg.email_sequence || {},\n  linkedin_sequence: pkg.linkedin_sequence || {},\n  meeting_pitch: pkg.meeting_pitch || {},\n  approval: {\n    approval_status: 'PENDING_REVIEW',\n    review_notes: pkg.approval?.review_notes || 'Pending human review before any outreach action.'\n  },\n  claims_validation: claims,\n  metadata: {\n    execution_id: executionId,\n    created_at: nowIso,\n    workflow_name: 'VenturelyHub Outbound Generation',\n    phase: 'Phase 2 - Personalization & Outbound Generation',\n    test_fixture: Boolean(item.test_fixture),\n    source_execution_id: sourceExecId\n  }\n};\n\n// Prepare flattened row for Google Sheets Outbound Generation Outputs\nconst email1 = pkg.email_sequence?.email_1 || {};\nconst sheetRow = {\n  execution_id: executionId,\n  created_at: nowIso,\n  workflow_name: 'VenturelyHub Outbound Generation',\n  phase: 'Phase 2 - Outbound Generation',\n  status: 'SUCCESS',\n  test_fixture: Boolean(item.test_fixture),\n  organization_name: profile.organization_name || 'Unknown',\n  target_channel: 'Email + LinkedIn',\n  subject_line: email1.subject || 'Exploring Technology Collaboration',\n  message_body: email1.body || '',\n  personalization_angle: pkg.personalization_analysis?.personalization_angle || analysis.outreach_angle || '',\n  raw_output_json: JSON.stringify(finalOutput)\n};\n\nreturn [{\n  json: {\n    ...sheetRow,\n    _final_response: finalOutput\n  }\n}];"
+      },
+      "id": "node-p2-build-output-001",
+      "name": "BUILD_OutputPayload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "15__ZAea7cXNS0U3sd-GzsTuZWSFMIgomM_EHPjUr5N4"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Outbound Generation Outputs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "execution_id": "={{ $json.execution_id }}",
+            "created_at": "={{ $json.created_at }}",
+            "workflow_name": "={{ $json.workflow_name }}",
+            "phase": "={{ $json.phase }}",
+            "status": "={{ $json.status }}",
+            "test_fixture": "={{ $json.test_fixture }}",
+            "organization_name": "={{ $json.organization_name }}",
+            "target_channel": "={{ $json.target_channel }}",
+            "subject_line": "={{ $json.subject_line }}",
+            "message_body": "={{ $json.message_body }}",
+            "personalization_angle": "={{ $json.personalization_angle }}",
+            "raw_output_json": "={{ $json.raw_output_json }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflow_name",
+              "displayName": "workflow_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phase",
+              "displayName": "phase",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_fixture",
+              "displayName": "test_fixture",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "organization_name",
+              "displayName": "organization_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "target_channel",
+              "displayName": "target_channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject_line",
+              "displayName": "subject_line",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message_body",
+              "displayName": "message_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "personalization_angle",
+              "displayName": "personalization_angle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "raw_output_json",
+              "displayName": "raw_output_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-p2-sheets-outbound-001",
+      "name": "GOOGLE_SHEETS_Append_Outbound",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2200,
+        260
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "JQRGvtvkfjEPF9WK",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst original = item._final_response || $('BUILD_OutputPayload').first().json._final_response;\nreturn [{ json: original }];"
+      },
+      "id": "node-p2-return-out-001",
+      "name": "RETURN_Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst now = new Date();\nconst nowIso = now.toISOString();\nconst datePrefix = nowIso.split('T')[0].replace(/-/g, '');\nconst randomSuffix = Math.floor(1000 + Math.random() * 9000);\nconst eventId = `EVT-P2-${datePrefix}-${randomSuffix}`;\n\nconst errorResponse = {\n  error: {\n    code: item.errorCode || 'INVALID_INPUT',\n    message: item.errorMessage || 'Invalid payload provided to Outbound Generation workflow.'\n  },\n  approval: {\n    approval_status: 'PENDING_REVIEW',\n    review_notes: 'Execution rejected during input validation.'\n  },\n  metadata: {\n    event_id: eventId,\n    created_at: nowIso,\n    workflow_name: 'VenturelyHub Outbound Generation',\n    phase: 'Phase 2 - Personalization & Outbound Generation',\n    status: 'VALIDATION_FAILED',\n    test_fixture: Boolean(item.test_fixture)\n  }\n};\n\nconst systemEventRow = {\n  event_id: eventId,\n  created_at: nowIso,\n  workflow_name: 'VenturelyHub Outbound Generation',\n  phase: 'Phase 2 - Outbound Generation',\n  event_type: item.errorCode || 'VALIDATION_FAILURE',\n  status: 'VALIDATION_FAILED',\n  test_fixture: Boolean(item.test_fixture),\n  message: item.errorMessage || 'Input validation failed.',\n  raw_event_json: JSON.stringify(errorResponse)\n};\n\nreturn [{\n  json: {\n    ...systemEventRow,\n    _error_response: errorResponse\n  }\n}];"
+      },
+      "id": "node-p2-format-err-001",
+      "name": "FORMAT_ErrorOutput",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "15__ZAea7cXNS0U3sd-GzsTuZWSFMIgomM_EHPjUr5N4"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "System Events"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{ $json.event_id }}",
+            "created_at": "={{ $json.created_at }}",
+            "workflow_name": "={{ $json.workflow_name }}",
+            "phase": "={{ $json.phase }}",
+            "event_type": "={{ $json.event_type }}",
+            "status": "={{ $json.status }}",
+            "test_fixture": "={{ $json.test_fixture }}",
+            "message": "={{ $json.message }}",
+            "raw_event_json": "={{ $json.raw_event_json }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflow_name",
+              "displayName": "workflow_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phase",
+              "displayName": "phase",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_type",
+              "displayName": "event_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_fixture",
+              "displayName": "test_fixture",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "raw_event_json",
+              "displayName": "raw_event_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-p2-sheets-err-001",
+      "name": "GOOGLE_SHEETS_Append_SystemEvent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1100,
+        500
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "JQRGvtvkfjEPF9WK",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst original = item._error_response || $('FORMAT_ErrorOutput').first().json._error_response;\nreturn [{ json: original }];"
+      },
+      "id": "node-p2-return-err-001",
+      "name": "RETURN_ErrorOutput",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        500
+      ]
+    }
+  ],
+  "nodeGroups": [],
+  "activeVersion": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  }
+}

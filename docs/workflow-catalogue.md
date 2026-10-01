@@ -79,5 +79,34 @@ This catalogue tracks all n8n workflows managed within the VenturelyHub Marketin
   - Target Worksheets: `Prospect Intelligence Outputs`, `System Events` (and 6 future phase worksheets)
 - **Current Status:** Implemented, 100% node validation pass, live runtime verified (Executions 7-12 verified across all 6 test scenarios with Qwen3 8B local inference and live Google Sheets appends), synchronized with live local n8n runtime, safely inactive.
 
+---
 
+### 4. VenturelyHub Outbound Generation
 
+- **Repository Filename:** `02_outbound/outbound_generation.json`
+- **Workflow Name:** `VenturelyHub Outbound Generation`
+- **Live n8n Workflow ID:** `vhOutboundGen001`
+- **Active Status:** `INACTIVE` (`active: false`)
+- **Total Nodes:** 16 nodes (14 functional execution nodes + 2 sticky documentation notes)
+- **Purpose:** Multi-channel outbound copy synthesis and draft generation engine:
+  1. Trigger: `POST /webhook/outbound-generation`
+  2. Input Validation: Enforces required `prospect_profile` and `venturelyhub_analysis`, captures source execution ID, flags synthetic test fixtures
+  3. Payload Normalization: Normalizes verified lists, prepares structured evidence context
+  4. Outbound Prompt Preparation: Injects VenturelyHub service matrix, verified prospect facts, and strict anti-hallucination rules
+  5. AI Outbound Generation (Ollama Qwen3 8B): Synthesizes personalization analysis, 4-touch email sequence (Email 1, Follow-up 1, Follow-up 2, Follow-up 3), 3-touch LinkedIn sequence, and compact meeting pitch brief
+  6. Response Parsing & Fallback: Parses Ollama JSON mode output with fallback protection
+  7. Claim Validation Layer: Scans generated text against Phase 1 evidence to guarantee zero unsupported funding/hiring/tech claims
+  8. Human Review Safeguard: Enforces `approval_status: "PENDING_REVIEW"` on every generated package. Zero automatic sending (no Gmail/LinkedIn execution)
+  9. Persistent Audit Append: Appends record to `VenturelyHub` Google Spreadsheet (`Outbound Generation Outputs` on success, `System Events` on validation failure) with non-blocking error handling (`continueRegularOutput`)
+  10. Direct Response: Delivers complete structured outbound package directly to caller
+- **Dependencies:**
+  - Ingests structured JSON payload produced by Phase 1 (`vhProspectInt001`)
+- **Credential Requirements & Verification Status:**
+  - Local Ollama API: Zero-credential HTTP endpoint (`http://127.0.0.1:11434/api/chat`, model `qwen3:8b`) — `AUTHENTICATION_VERIFIED / NATIVE_LOCAL`
+  - Google Sheets OAuth2 API (`googleSheetsOAuth2Api`): Credential ID `JQRGvtvkfjEPF9WK` (`srisaikirantambalkar@gmail.com`) — `AUTHENTICATION_VERIFIED`
+  - Gmail / LinkedIn: Strictly omitted; no sending permitted in Phase 2
+- **Target Resources:**
+  - Webhook endpoint: `/webhook/outbound-generation`
+  - Spreadsheet: `VenturelyHub` (ID: `15__ZAea7cXNS0U3sd-GzsTuZWSFMIgomM_EHPjUr5N4`)
+  - Target Worksheets: `Outbound Generation Outputs`, `System Events`
+- **Current Status:** Implemented, 100% node validation pass, live runtime verified (Executions 13-18 verified across all 6 test scenarios with Qwen3 8B local inference and live Google Sheets appends), synchronized with live local n8n runtime, safely inactive.

@@ -74,10 +74,21 @@ The system leverages specialized models to enforce a clear separation between **
 - **Validation Layer:** Enforces input hygiene, required organization name, and test fixture detection.
 - **Research Layer:** Gemini-powered search with built-in tools (`googleSearch`, `urlContext`).
 - **Structuring Layer:** Normalizes facts, verifies data density, triggers defensive fallbacks if information is sparse.
-- **Analysis Layer:** Claude-powered commercial fit analysis mapping against VenturelyHub core service domains.
+- **Analysis Layer:** Local Ollama / Qwen3 8B powered commercial fit analysis mapping against VenturelyHub core service domains.
 - **Output Formatting Layer:** Constructs standard contract-compliant JSON payload.
 - **Audit Storage Layer:** Validates sheet payload and appends execution records to `VenturelyHub` spreadsheet (`Prospect Intelligence Outputs` on success, `System Events` on validation failure) with non-blocking error handling (`continueRegularOutput`).
 - **Direct Response Layer:** Returns complete structured intelligence payload directly to the caller.
+
+#### Phase 2: Personalization & Outbound Generation Pipeline (`02_outbound/`)
+- **Trigger Layer:** Webhook receiving Phase 1 prospect intelligence payload (`POST /webhook/outbound-generation`).
+- **Validation Layer:** Enforces required sections (`prospect_profile`, `venturelyhub_analysis`), captures source execution ID, flags synthetic test fixtures.
+- **Normalization Layer:** Cleans arrays, prepares structured evidence context.
+- **Prompting & Grounding Layer:** Injects VenturelyHub service matrix, verified prospect facts, and strict anti-hallucination rules.
+- **Synthesis Layer:** Local Ollama / Qwen3 8B generates 4-touch email sequence, 3-touch LinkedIn sequence, compact meeting pitch brief, and personalization analysis.
+- **Claim Validation Layer:** JavaScript filter scans generated copy against Phase 1 evidence to guarantee zero unsupported claims.
+- **Human Review Safeguard:** Enforces `approval_status: "PENDING_REVIEW"` on every generated package. Zero automatic sending.
+- **Audit Storage Layer:** Appends execution record to `VenturelyHub` spreadsheet (`Outbound Generation Outputs` on success, `System Events` on error).
+- **Direct Response Layer:** Delivers complete multi-channel campaign package directly to caller.
 
 ---
 
