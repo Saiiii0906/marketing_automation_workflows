@@ -1,9 +1,204 @@
 {
+  "id": "vhProspectInt001",
   "name": "VenturelyHub Prospect Intelligence",
+  "active": false,
+  "isArchived": false,
+  "versionId": "6404e863-e2b5-41e2-8f2c-c293940a76ff",
+  "activeVersionId": null,
+  "triggerCount": 0,
+  "nodeCount": 20,
+  "createdAt": "2026-09-30T13:25:28.615Z",
+  "updatedAt": "2026-10-01T15:10:56.960Z",
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timezone": "Asia/Kolkata",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "tags": [],
+  "parentFolderId": null,
+  "scopes": [
+    "execution:delete",
+    "execution:list",
+    "execution:read",
+    "execution:reveal",
+    "workflow:create",
+    "workflow:delete",
+    "workflow:disableRedaction",
+    "workflow:enableRedaction",
+    "workflow:execute",
+    "workflow:execute-chat",
+    "workflow:export",
+    "workflow:import",
+    "workflow:list",
+    "workflow:move",
+    "workflow:publish",
+    "workflow:read",
+    "workflow:share",
+    "workflow:unpublish",
+    "workflow:unshare",
+    "workflow:update"
+  ],
+  "canExecute": true,
+  "connections": {
+    "TRIGGER_ProspectInput": {
+      "main": [
+        [
+          {
+            "node": "VALIDATE_Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDATE_Input": {
+      "main": [
+        [
+          {
+            "node": "ROUTE_Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ROUTE_Validation": {
+      "main": [
+        [
+          {
+            "node": "PREPARE_GeminiPrompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "FORMAT_ErrorOutput",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARE_GeminiPrompt": {
+      "main": [
+        [
+          {
+            "node": "RESEARCH_Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RESEARCH_Gemini": {
+      "main": [
+        [
+          {
+            "node": "STRUCTURE_Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "STRUCTURE_Research": {
+      "main": [
+        [
+          {
+            "node": "PREPARE_StrategyPrompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FORMAT_Output": {
+      "main": [
+        [
+          {
+            "node": "VALIDATE_SheetPayload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDATE_SheetPayload": {
+      "main": [
+        [
+          {
+            "node": "GOOGLE_SHEETS_Append_ProspectIntelligence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GOOGLE_SHEETS_Append_ProspectIntelligence": {
+      "main": [
+        [
+          {
+            "node": "RETURN_Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FORMAT_ErrorOutput": {
+      "main": [
+        [
+          {
+            "node": "GOOGLE_SHEETS_Append_SystemEvent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GOOGLE_SHEETS_Append_SystemEvent": {
+      "main": [
+        [
+          {
+            "node": "RETURN_ErrorOutput",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARE_StrategyPrompt": {
+      "main": [
+        [
+          {
+            "node": "ANALYZE_Strategy_Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ANALYZE_Strategy_Ollama": {
+      "main": [
+        [
+          {
+            "node": "FORMAT_Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
   "nodes": [
     {
       "parameters": {
-        "content": "## \ud83c\udfaf VENTURELYHUB PROSPECT INTELLIGENCE\n**Stateless Prospect Research & Strategic Fit Pipeline**\n\n- Trigger: `POST /webhook/prospect-intelligence`\n- Role: Researches & qualifies prospects for VenturelyHub.\n- CRM Rule: Zero persistent database or CRM storage.\n- Output Layer: Direct JSON response + Google Sheets audit append.\n- Division of Labor: Gemini (Factual Research) \u2192 Claude (Fit Analysis).",
+        "content": "## \ud83c\udfaf VENTURELYHUB PROSPECT INTELLIGENCE\n**Stateless Prospect Research & Strategic Fit Pipeline**\n\n- Trigger: \n- Role: Researches & qualifies prospects for VenturelyHub.\n- CRM Rule: Zero persistent database or CRM storage.\n- Output Layer: Direct JSON response + Google Sheets audit append.\n- Division of Labor: Gemini 2.5 Flash (Factual Research) \u2192 Ollama Qwen3 8B (Strategic Analysis).",
         "height": 220,
         "width": 440,
         "color": 4
@@ -165,13 +360,13 @@
     },
     {
       "parameters": {
-        "content": "## \ud83e\udde0 CLAUDE STRATEGIC FIT LAYER\n**Node:** ANALYZE_Claude\n\n- Role: Commercial relevance, offer selection & angle.\n- Input: Factual research from Gemini (no fact inventing).\n- Context: VenturelyHub services & partnership models.\n- Output: Fit level, recommended offer & CTA.",
+        "content": "## \ud83e\udde0 OLLAMA STRATEGIC FIT LAYER\n**Node:** ANALYZE_Strategy_Ollama\n\n- Model: Qwen3 8B (qwen3:8b via Ollama)\n- Role: Commercial relevance, offer selection & angle.\n- Input: Factual research from Gemini (no fact inventing).\n- Context: VenturelyHub services & partnership models.\n- Output: Strategic qualification & offer recommendation.",
         "height": 220,
         "width": 460,
         "color": 3
       },
       "id": "note-claude-analysis-001",
-      "name": "NOTE_ClaudeAnalysis",
+      "name": "NOTE_OllamaStrategy",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -181,48 +376,16 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nconst res = item.structured_research;\nconst researchStatus = item.research_status;\n\nconst prompt = `You are the Senior Commercial Strategy & Sales Intelligence Lead for VenturelyHub.\nAnalyze the following factual prospect research and generate strategic qualification and outreach recommendations.\n\nVENTURELYHUB COMPANY PROFILE & CORE CAPABILITIES:\nVenturelyHub is a technology innovation and engineering partner serving incubators, startups, and enterprises:\n- Product Engineering & Custom Software\n- Web Development & Mobile App Development (iOS/Android/Flutter)\n- SaaS Development & Enterprise Platforms\n- AI Development, Custom AI Agents & Autonomous Chatbots\n- AI Analytics, Predictive BI & Data Intelligence\n- Cloud Architecture, DevOps Automation, Server Management & CI/CD\n- UI/UX Design, Design Systems & Product Strategy\n- Custom SDK Development & API Integrations\n- Startup Product Acceleration (MVP development, Tech clinics, CTO advisory)\n\nFACTUAL RESEARCH DATA (Strictly grounded - do NOT invent facts beyond this):\n${JSON.stringify(res, null, 2)}\n\nRESEARCH STATUS: ${researchStatus}\n\nANALYSIS INSTRUCTIONS:\n1. VENTURELYHUB RELEVANCE: Analyze how VenturelyHub's specific capabilities map to this organization's verified profile.\n2. FIT LEVEL: Choose exactly one: HIGH | MEDIUM | LOW | INSUFFICIENT_DATA. Explain the concrete reasoning (no arbitrary numbers). If public research is sparse, choose INSUFFICIENT_DATA or LOW.\n3. RELEVANT SERVICES: Select 2 to 4 matching VenturelyHub services supported by the evidence.\n4. RECOMMENDED OFFER: Select or design a tailored offer aligned with their segment:\n   - For Incubators/Accelerators: Technology Partner, Startup Product Clinic, AI/Product Workshop, Technical Office Hours\n   - For Startups: MVP Development, AI Agent Engineering, SaaS Engineering, Cloud/DevOps\n   - For Enterprises/SMEs: Custom Enterprise Software, AI Integration, Cloud Modernization, Custom SDK\n5. VALUE PROPOSITION: One compelling, specific sentence articulating why VenturelyHub adds value to them.\n6. PERSONALIZATION ANGLE: Specific context or recent initiative to reference in outreach.\n7. RECOMMENDED CONTACT ROLE: Target public job title (e.g. \"Head of Incubation\", \"CTO\", \"Director of Partnerships\").\n8. SUGGESTED CTA: Low-friction call-to-action suitable for cold outreach (e.g., exploratory 15-min chat, technical workshop offer).\n9. POTENTIAL OBJECTIONS: Anticipate 2 realistic commercial or technical objections.\n10. CONFIDENCE: HIGH | MEDIUM | LOW.\n11. SEPARATE FACTS FROM ANALYSIS: Clearly state analysis as strategic opportunity rather than established fact.\n\nReturn ONLY valid JSON matching this schema:\n{\n  \"fit_level\": \"HIGH | MEDIUM | LOW | INSUFFICIENT_DATA\",\n  \"fit_reasons\": [\"Point 1 explaining why\", \"Point 2 explaining why\"],\n  \"relevant_services\": [\"Service 1\", \"Service 2\"],\n  \"recommended_offer\": \"Concise name and description of recommended offer\",\n  \"value_proposition\": \"Clear, compelling value proposition\",\n  \"personalization_angle\": \"Angle grounded in verified research\",\n  \"recommended_contact_role\": \"Target role title\",\n  \"suggested_cta\": \"Specific low-friction CTA\",\n  \"potential_objections\": [\"Objection 1 and response hint\", \"Objection 2 and response hint\"],\n  \"confidence\": \"HIGH | MEDIUM | LOW\"\n}`;\n\nreturn [{\n  json: {\n    ...item,\n    claude_prompt: prompt\n  }\n}];"
+        "jsCode": "const item = $input.first().json;\nconst res = item.structured_research;\nconst researchStatus = item.research_status;\n\nconst prompt = `You are VenturelyHub's B2B technology strategy analyst.\nAnalyze the following verified factual prospect research and produce strategic qualification and outreach recommendations.\n\nVENTURELYHUB PROFILE & CORE CAPABILITIES:\nVenturelyHub is a technology innovation and software engineering partner serving incubators, startups, and enterprises:\n- Product Engineering & Custom Software\n- Web Development & Mobile App Development (iOS/Android/Flutter)\n- SaaS Development & Enterprise Platforms\n- AI Development, Custom AI Agents & Autonomous Chatbots\n- AI Analytics, Predictive BI & Data Intelligence\n- Cloud Architecture, DevOps Automation, Server Management & CI/CD\n- UI/UX Design, Design Systems & Product Strategy\n- Custom SDK Development & API Integrations\n- Startup Product Acceleration (MVP development, Tech clinics, CTO advisory)\n\nFACTUAL RESEARCH DATA (Strictly grounded - do NOT invent facts beyond this):\n${JSON.stringify(res, null, 2)}\n\nRESEARCH STATUS: ${researchStatus}\n\nRULES:\n1. Do not invent factual claims.\n2. Do not add facts that are not present in the supplied research evidence.\n3. Separate factual evidence from commercial interpretation.\n4. Base recommendations only on available evidence.\n5. If evidence is insufficient, explicitly set fit_level to INSUFFICIENT_DATA and confidence to LOW.\n6. Do not invent contact names. Use only target job titles/roles.\n7. Do not invent funding, hiring, partnerships, programs, technology stacks, or customers.\n8. Do not treat test fixtures as real prospects.\n9. Do not generate outreach messages in Phase 1.\n10. Return valid JSON only adhering strictly to this schema:\n{\n  \"fit_level\": \"HIGH | MEDIUM | LOW | INSUFFICIENT_DATA\",\n  \"fit_reasons\": [\"Point 1 explaining why based on evidence\", \"Point 2 explaining why based on evidence\"],\n  \"venturelyhub_relevance\": \"Explanation of commercial relevance\",\n  \"relevant_services\": [\"Service 1\", \"Service 2\"],\n  \"recommended_offer\": \"Name and concise description of recommended offer\",\n  \"value_proposition\": \"Compelling, specific value proposition sentence\",\n  \"outreach_angle\": \"Specific context grounded in verified research\",\n  \"personalization_angle\": \"Same or complementary verified context angle\",\n  \"recommended_contact_role\": \"Target role title from research\",\n  \"recommended_cta\": \"Low-friction call to action\",\n  \"suggested_cta\": \"Specific low-friction CTA\",\n  \"potential_objections\": [\"Objection 1 and response hint\", \"Objection 2 and response hint\"],\n  \"confidence\": \"HIGH | MEDIUM | LOW\"\n}`;\n\nreturn [{\n  json: {\n    ...item,\n    strategy_prompt: prompt\n  }\n}];"
       },
       "id": "node-prep-claude-001",
-      "name": "PREPARE_ClaudePrompt",
+      "name": "PREPARE_StrategyPrompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         1760,
         368
       ]
-    },
-    {
-      "parameters": {
-        "modelId": {
-          "__rl": true,
-          "mode": "list",
-          "value": "claude-3-7-sonnet-20250219"
-        },
-        "messages": {
-          "values": [
-            {
-              "content": "={{ $json.claude_prompt }}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "node-claude-analysis-001",
-      "name": "ANALYZE_Claude",
-      "type": "@n8n/n8n-nodes-langchain.anthropic",
-      "typeVersion": 1,
-      "position": [
-        2032,
-        368
-      ],
-      "onError": "continueRegularOutput",
-      "credentials": {
-        "anthropicApi": {
-          "id": "vh_anthropic_api",
-          "name": "Anthropic account"
-        }
-      }
     },
     {
       "parameters": {
@@ -242,7 +405,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nconst structNode = $('STRUCTURE_Research').first().json;\nconst valNode = $('VALIDATE_Input').first().json;\nconst res = item.structured_research || structNode.structured_research;\nconst rawInput = item.input || valNode.input;\nconst isTestFixture = item.test_fixture ?? structNode.test_fixture ?? valNode.test_fixture;\nconst today = new Date().toISOString();\n\nlet claudeText = '';\nif (item.response && typeof item.response === 'string') {\n  claudeText = item.response;\n} else if (item.text && typeof item.text === 'string') {\n  claudeText = item.text;\n} else if (typeof item === 'string') {\n  claudeText = item;\n} else if (item.content && typeof item.content === 'string') {\n  claudeText = item.content;\n}\n\nlet analysis = null;\nif (claudeText) {\n  try {\n    const jsonMatch = claudeText.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/) || [null, claudeText];\n    const cleanJson = (jsonMatch[1] || claudeText).trim();\n    analysis = JSON.parse(cleanJson);\n  } catch (e) {\n    analysis = null;\n  }\n}\n\n// Fallback if Claude node was simulated or response was raw\nif (!analysis || typeof analysis !== 'object') {\n  const isInsuff = structNode.research_status === 'INSUFFICIENT_DATA';\n  analysis = {\n    fit_level: isInsuff ? 'INSUFFICIENT_DATA' : 'MEDIUM',\n    fit_reasons: isInsuff \n      ? ['Insufficient public information available to verify commercial technology fit.']\n      : ['Analysis generated based on available verified public profile data.'],\n    relevant_services: isInsuff ? [] : ['Product Engineering', 'AI Development', 'Cloud Architecture'],\n    recommended_offer: isInsuff ? 'Preliminary Discovery / Qualification' : 'Exploratory Technology Capabilities Consultation',\n    value_proposition: isInsuff \n      ? 'Pending further direct discovery with organization leadership.'\n      : `Supporting ${res.organization.name} with dedicated software engineering and AI capabilities.`,\n    personalization_angle: isInsuff\n      ? 'Requesting initial discussion on their current technology objectives and roadmap.'\n      : `Focus on their activities in ${res.focus_areas.join(', ') || 'technology innovation'}.`,\n    recommended_contact_role: res.relevant_contact_roles[0] || 'Relevant contact not publicly verified.',\n    suggested_cta: isInsuff\n      ? 'Introductory query to establish correct point of contact.'\n      : 'Invite for a brief 15-minute technology alignment conversation.',\n    potential_objections: isInsuff \n      ? ['Unknown project requirements or operational scale']\n      : ['Existing internal tech team or development partners', 'Budget allocation'],\n    confidence: isInsuff ? 'LOW' : 'MEDIUM'\n  };\n}\n\n// Construct standard final output object per contract\nconst finalOutput = {\n  prospect_profile: {\n    organization_name: res.organization.name,\n    website: res.organization.website,\n    type: res.organization.type,\n    location: res.organization.location,\n    description: res.description,\n    focus_areas: res.focus_areas,\n    industries: res.industries,\n    programs: res.programs,\n    technology_focus: res.technology_focus\n  },\n  research: {\n    relevant_activities: res.relevant_activities,\n    partnership_signals: res.partnership_signals,\n    relevant_contact_roles: res.relevant_contact_roles,\n    sources: res.sources,\n    research_date: res.research_date\n  },\n  venturelyhub_analysis: {\n    fit_level: analysis.fit_level || 'MEDIUM',\n    fit_reasons: Array.isArray(analysis.fit_reasons) ? analysis.fit_reasons : [String(analysis.fit_reasons)],\n    relevant_services: Array.isArray(analysis.relevant_services) ? analysis.relevant_services : [],\n    recommended_offer: analysis.recommended_offer || 'Technology Partnership Discussion',\n    value_proposition: analysis.value_proposition || '',\n    personalization_angle: analysis.personalization_angle || '',\n    recommended_contact_role: analysis.recommended_contact_role || 'Relevant contact not publicly verified.',\n    suggested_cta: analysis.suggested_cta || '',\n    potential_objections: Array.isArray(analysis.potential_objections) ? analysis.potential_objections : [],\n    confidence: analysis.confidence || 'MEDIUM'\n  },\n  metadata: {\n    workflow_name: 'VenturelyHub Prospect Intelligence',\n    processed_at: today,\n    status: 'SUCCESS',\n    test_fixture: Boolean(isTestFixture)\n  }\n};\n\nreturn [{ json: finalOutput }];"
+        "jsCode": "const item = $input.first().json;\nconst structNode = $('STRUCTURE_Research').first().json;\nconst valNode = $('VALIDATE_Input').first().json;\nconst res = item.structured_research || structNode.structured_research;\nconst rawInput = item.input || valNode.input;\nconst isTestFixture = item.test_fixture ?? structNode.test_fixture ?? valNode.test_fixture;\nconst today = new Date().toISOString();\n\n// Extract text from Ollama chat response or legacy response shapes\nlet rawText = '';\nif (item.message?.content && typeof item.message.content === 'string') {\n  rawText = item.message.content;\n} else if (item.response && typeof item.response === 'string') {\n  rawText = item.response;\n} else if (item.content && typeof item.content === 'string') {\n  rawText = item.content;\n} else if (item.text && typeof item.text === 'string') {\n  rawText = item.text;\n} else if (typeof item === 'string') {\n  rawText = item;\n}\n\nlet analysis = null;\nif (rawText) {\n  try {\n    const jsonMatch = rawText.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/) || [null, rawText];\n    const cleanJson = (jsonMatch[1] || rawText).trim();\n    analysis = JSON.parse(cleanJson);\n  } catch (e) {\n    try {\n      const start = rawText.indexOf('{');\n      const end = rawText.lastIndexOf('}');\n      if (start !== -1 && end > start) {\n        analysis = JSON.parse(rawText.slice(start, end + 1));\n      }\n    } catch (e2) {\n      analysis = null;\n    }\n  }\n}\n\n// Fallback if Ollama node failed, timed out, or returned malformed JSON\nif (!analysis || typeof analysis !== 'object') {\n  const isInsuff = structNode.research_status === 'INSUFFICIENT_DATA';\n  analysis = {\n    fit_level: isInsuff ? 'INSUFFICIENT_DATA' : 'MEDIUM',\n    fit_reasons: isInsuff \n      ? ['Insufficient public information available to verify commercial technology fit.']\n      : ['Analysis generated based on available verified public profile data.'],\n    venturelyhub_relevance: isInsuff\n      ? 'Insufficient public information to establish commercial alignment.'\n      : `Potential alignment with ${res.organization.name} technology initiatives.`,\n    relevant_services: isInsuff ? [] : ['Product Engineering', 'AI Development', 'Cloud Architecture'],\n    recommended_offer: isInsuff ? 'Preliminary Discovery / Qualification' : 'Exploratory Technology Capabilities Consultation',\n    value_proposition: isInsuff \n      ? 'Pending further direct discovery with organization leadership.'\n      : `Supporting ${res.organization.name} with dedicated software engineering and AI capabilities.`,\n    outreach_angle: isInsuff\n      ? 'Requesting initial discussion on their current technology objectives and roadmap.'\n      : `Focus on their activities in ${res.focus_areas.join(', ') || 'technology innovation'}.`,\n    personalization_angle: isInsuff\n      ? 'Requesting initial discussion on their current technology objectives and roadmap.'\n      : `Focus on their activities in ${res.focus_areas.join(', ') || 'technology innovation'}.`,\n    recommended_contact_role: res.relevant_contact_roles[0] || 'Relevant contact not publicly verified.',\n    recommended_cta: isInsuff\n      ? 'Introductory query to establish correct point of contact.'\n      : 'Invite for a brief 15-minute technology alignment conversation.',\n    suggested_cta: isInsuff\n      ? 'Introductory query to establish correct point of contact.'\n      : 'Invite for a brief 15-minute technology alignment conversation.',\n    potential_objections: isInsuff \n      ? ['Unknown project requirements or operational scale']\n      : ['Existing internal tech team or development partners', 'Budget allocation'],\n    confidence: isInsuff ? 'LOW' : 'MEDIUM'\n  };\n}\n\n// Construct standard final output object per contract\nconst finalOutput = {\n  prospect_profile: {\n    organization_name: res.organization.name,\n    website: res.organization.website,\n    type: res.organization.type,\n    location: res.organization.location,\n    description: res.description,\n    focus_areas: res.focus_areas,\n    industries: res.industries,\n    programs: res.programs,\n    technology_focus: res.technology_focus\n  },\n  research: {\n    relevant_activities: res.relevant_activities,\n    partnership_signals: res.partnership_signals,\n    relevant_contact_roles: res.relevant_contact_roles,\n    sources: res.sources,\n    research_date: res.research_date\n  },\n  venturelyhub_analysis: {\n    fit_level: analysis.fit_level || 'MEDIUM',\n    fit_reasons: Array.isArray(analysis.fit_reasons) ? analysis.fit_reasons : [String(analysis.fit_reasons)],\n    venturelyhub_relevance: analysis.venturelyhub_relevance || '',\n    relevant_services: Array.isArray(analysis.relevant_services) ? analysis.relevant_services : [],\n    recommended_offer: analysis.recommended_offer || 'Technology Partnership Discussion',\n    value_proposition: analysis.value_proposition || '',\n    outreach_angle: analysis.outreach_angle || analysis.personalization_angle || '',\n    personalization_angle: analysis.personalization_angle || analysis.outreach_angle || '',\n    recommended_contact_role: analysis.recommended_contact_role || res.relevant_contact_roles[0] || 'Relevant contact not publicly verified.',\n    recommended_cta: analysis.recommended_cta || analysis.suggested_cta || '',\n    suggested_cta: analysis.suggested_cta || analysis.recommended_cta || '',\n    potential_objections: Array.isArray(analysis.potential_objections) ? analysis.potential_objections : [],\n    confidence: analysis.confidence || 'MEDIUM'\n  },\n  metadata: {\n    workflow_name: 'VenturelyHub Prospect Intelligence',\n    processed_at: today,\n    status: 'SUCCESS',\n    test_fixture: Boolean(isTestFixture),\n    strategy_engine: 'Ollama Qwen3 8B'\n  }\n};\n\nreturn [{ json: finalOutput }];"
       },
       "id": "node-format-output-001",
       "name": "FORMAT_Output",
@@ -618,175 +781,36 @@
         1504,
         624
       ]
+    },
+    {
+      "id": "bb3b81c9-e6ad-4955-bac1-478e3d2f5821",
+      "name": "ANALYZE_Strategy_Ollama",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2020,
+        360
+      ],
+      "parameters": {
+        "authentication": "none",
+        "contentType": "json",
+        "jsonBody": "={{ {\n  model: 'qwen3:8b',\n  messages: [\n    {\n      role: 'user',\n      content: $json.strategy_prompt\n    }\n  ],\n  stream: false,\n  format: 'json',\n  options: {\n    temperature: 0.2,\n    num_predict: 900\n  }\n} }}",
+        "method": "POST",
+        "options": {
+          "timeout": 180000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "http://127.0.0.1:11434/api/chat"
+      },
+      "onError": "continueRegularOutput"
     }
   ],
-  "connections": {
-    "TRIGGER_ProspectInput": {
-      "main": [
-        [
-          {
-            "node": "VALIDATE_Input",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "VALIDATE_Input": {
-      "main": [
-        [
-          {
-            "node": "ROUTE_Validation",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "ROUTE_Validation": {
-      "main": [
-        [
-          {
-            "node": "PREPARE_GeminiPrompt",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "FORMAT_ErrorOutput",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "PREPARE_GeminiPrompt": {
-      "main": [
-        [
-          {
-            "node": "RESEARCH_Gemini",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "RESEARCH_Gemini": {
-      "main": [
-        [
-          {
-            "node": "STRUCTURE_Research",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "STRUCTURE_Research": {
-      "main": [
-        [
-          {
-            "node": "PREPARE_ClaudePrompt",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "PREPARE_ClaudePrompt": {
-      "main": [
-        [
-          {
-            "node": "ANALYZE_Claude",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "ANALYZE_Claude": {
-      "main": [
-        [
-          {
-            "node": "FORMAT_Output",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "FORMAT_Output": {
-      "main": [
-        [
-          {
-            "node": "VALIDATE_SheetPayload",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "VALIDATE_SheetPayload": {
-      "main": [
-        [
-          {
-            "node": "GOOGLE_SHEETS_Append_ProspectIntelligence",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "GOOGLE_SHEETS_Append_ProspectIntelligence": {
-      "main": [
-        [
-          {
-            "node": "RETURN_Output",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "FORMAT_ErrorOutput": {
-      "main": [
-        [
-          {
-            "node": "GOOGLE_SHEETS_Append_SystemEvent",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "GOOGLE_SHEETS_Append_SystemEvent": {
-      "main": [
-        [
-          {
-            "node": "RETURN_ErrorOutput",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
-  },
-  "active": false,
-  "settings": {
-    "executionOrder": "v1",
-    "binaryMode": "separate",
-    "timezone": "Asia/Kolkata",
-    "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "none",
-    "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": true
-  },
+  "nodeGroups": [],
+  "activeVersion": null,
   "meta": {
     "templateCredsSetupCompleted": false,
     "aiBuilderAssisted": true,
     "builderVariant": "mcp"
-  },
-  "tags": [],
-  "id": "vhProspectInt001"
+  }
 }

@@ -19,8 +19,8 @@ Its sole purpose is to automate the repetitive manual research and strategic eva
 | Component | Engine / Model | Operational Scope |
 | :--- | :--- | :--- |
 | **Orchestration** | n8n (`v2.41.3`) | Execution flow, schema validation, branching, error catching |
-| **Research Engine** | **Google Gemini** (`models/gemini-flash-latest`) | Factual web discovery, domain research, source verification, structured data extraction |
-| **Strategy & Analysis** | **Anthropic Claude** (`claude-3-7-sonnet-20250219`) | Strategic qualification, VenturelyHub fit analysis, offer recommendation, objection anticipation |
+| **Research Engine** | **Google Gemini** (`models/gemini-2.5-flash`) | Factual web discovery, domain research, source verification, structured data extraction |
+| **Strategy & Analysis** | **Ollama / Qwen3 8B** (`qwen3:8b` via `http://127.0.0.1:11434/api/chat`) | Strategic qualification, VenturelyHub fit analysis, offer recommendation, objection anticipation |
 | **Audit Storage** | **Google Sheets** (`VenturelyHub`) | Persistent output records (`Prospect Intelligence Outputs`) and error events (`System Events`) |
 
 ---
@@ -47,11 +47,11 @@ INPUT PAYLOAD
      ↓
 [STRUCTURE_Research] (Parses, validates research schema, verifies data density)
      ↓
-[PREPARE_ClaudePrompt] (Injects VenturelyHub capability matrix & prospect facts)
+[PREPARE_StrategyPrompt] (Injects VenturelyHub capability matrix & prospect facts)
      ↓
-[ANALYZE_Claude] (Generates fit level, offer, angle, CTA, and objections)
+[ANALYZE_Strategy_Ollama] (Calls local Ollama API qwen3:8b for fit, offer, angle, CTA, objections)
      ↓
-[FORMAT_Output] (Assembles unified contract-compliant payload)
+[FORMAT_Output] (Parses Ollama JSON, deterministic fallback if needed, assembles payload)
      ↓
 [VALIDATE_SheetPayload] (Prepares execution row, preserves raw_output_json, generates execution_id)
      ↓
@@ -219,23 +219,15 @@ The workflow appends records to the central `VenturelyHub` spreadsheet across tw
 
 ## 7. Verification & Runtime Execution Summary
 
-### A. Live n8n Runtime Executions (Verified in Runtime & Google Sheets)
-| Run | Execution ID | Input Entity / Test Category | Pipeline Behavior | Google Sheets Result | Direct Response | Overall Status |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Run 1** | `1` | `StealthCo Labs` (Initial debugging run) | `STRUCTURE_Research` threw TypeError due to unhandled undefined `item.input` from Gemini node output. | Did not reach append node | Stopped at node 5 | **DEBUGGED** |
-| **Run 2** | `2` | `StealthCo Labs` (Resource locator test) | Executed through pipeline; Google Sheets node reported missing `__rl: true` resource locator structure. | Failed with error (caught by `continueRegularOutput`) | Handled gracefully | **DEBUGGED** |
-| **Run 3** | `3` | `StealthCo Labs` (Controlled Safe Test — Success Path) | Validated `test_fixture: true`, processed through Gemini/Claude fallback, formatted 13 sheet columns, appended to Google Sheets, delivered direct response. | **Appended 1 row** to `Prospect Intelligence Outputs` (`EXEC-P1-20260930-4028`) | Complete structured JSON with status `SUCCESS` | **VERIFIED PASS** |
-| **Run 4** | `4` | Missing Name `""` (Error Path Test) | `ROUTE_Validation` branched to FALSE, formatted system event row, appended to `System Events`, delivered direct error response. | **Appended 1 row** to `System Events` (`EVT-P1-20260930-5244`); 0 rows added to `Prospect Intelligence Outputs` | Standardized error payload (`VALIDATION_FAILED`) | **VERIFIED PASS** |
-
-### B. Structural Schema & Logic Test Suite (Simulated Fixtures)
-| Test Case | Prospect Entity | Tested Behavior | Result |
-| :--- | :--- | :--- | :--- |
-| **TEST 1** | Incubator / Accelerator (`iCreate`) | Factual extraction, tech partner offer, ecosystem mapping | **PASS** (`HIGH` Fit) |
-| **TEST 2** | Tech Startup (`KiteMetrics AI`) | Early-stage SaaS qualification, dedicated engineering pod offer | **PASS** (`HIGH` Fit) |
-| **TEST 3** | Enterprise / SME (`Apex Logistics`) | Legacy modernization mapping, enterprise logistics offer | **PASS** (`HIGH` Fit) |
-| **TEST 4** | Limited Public Info (`StealthCo Labs`) | Sparse public data handling, fallback activation, `test_fixture: true` | **PASS** (`INSUFFICIENT_DATA`) |
-| **TEST 5** | Missing Input (`organization_name: ""`) | Input validation rejection, error formatting, event logging | **PASS** (`VALIDATION_FAILED`) |
-| **TEST 6** | Synthetic Domain (`example.com`) | Detection of synthetic test fixture, audit isolation | **PASS** (`test_fixture: true`) |
+### A. Live n8n Runtime Executions (Verified in Runtime, Ollama Qwen3 8B & Google Sheets)
+| Run | Execution ID | Input Entity / Test Category | Pipeline Behavior | Ollama Qwen3 8B Status | Google Sheets Result | Direct Response | Overall Status |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Test 1** | `7` | `iCreate` (Incubator / Accelerator) | Full pipeline executed. Grounded research by Gemini, strategic evaluation by Ollama Qwen3 8B, formatted & appended. | Executed `qwen3:8b` (42.3s, 720 tokens) | **Appended 1 row** to `Prospect Intelligence Outputs` (`EXEC-P1-20261001-9067`) | Complete structured JSON with status `SUCCESS` | **VERIFIED PASS** |
+| **Test 2** | `8` | `KiteMetrics AI` (Startup) | Startup profile research, Ollama Qwen3 8B strategic evaluation, formatted & appended. | Executed `qwen3:8b` (42.4s, 764 tokens) | **Appended 1 row** to `Prospect Intelligence Outputs` (`EXEC-P1-20261001-8680`) | Complete structured JSON with status `SUCCESS` | **VERIFIED PASS** |
+| **Test 3** | `9` | `Apex Logistics` (Enterprise) | Enterprise profile research, Ollama Qwen3 8B strategic evaluation, formatted & appended. | Executed `qwen3:8b` (43.2s, 781 tokens) | **Appended 1 row** to `Prospect Intelligence Outputs` (`EXEC-P1-20261001-8348`) | Complete structured JSON with status `SUCCESS` | **VERIFIED PASS** |
+| **Test 4** | `10` | `StealthCo Labs` (Limited Public Info) | Sparse domain research, fallback activation, Ollama Qwen3 8B conservative qualification. | Executed `qwen3:8b` (35.6s, 627 tokens) | **Appended 1 row** to `Prospect Intelligence Outputs` (`EXEC-P1-20261001-3566`) | Complete structured JSON (`INSUFFICIENT_DATA`, `LOW`) | **VERIFIED PASS** |
+| **Test 5** | `11` | Missing Org Name `""` (Validation Failure) | `ROUTE_Validation` branched to FALSE, formatted system event row, appended to `System Events`, delivered direct error response. | Skipped (routed to error branch before LLM) | **Appended 1 row** to `System Events` (`EVT-P1-20261001-1401`); 0 rows to outputs tab | Standardized error payload (`VALIDATION_FAILED`) | **VERIFIED PASS** |
+| **Test 6** | `12` | `Example Corp` (Synthetic Domain) | Preserved `test_fixture: true`, research & Ollama strategic evaluation completed, appended to sheet. | Executed `qwen3:8b` (39.0s, 701 tokens) | **Appended 1 row** to `Prospect Intelligence Outputs` (`EXEC-P1-20261001-1759`) with `test_fixture: true` | Complete structured JSON with status `SUCCESS` | **VERIFIED PASS** |
 
 ---
 
@@ -243,9 +235,10 @@ The workflow appends records to the central `VenturelyHub` spreadsheet across tw
 - **Live n8n Workflow ID:** `vhProspectInt001`
 - **Total Nodes:** 20 nodes (15 functional execution nodes + 5 sticky documentation notes)
 - **Active State:** `INACTIVE` (`active: false`)
-- **Connected Credentials & Verification Status:**
-  - **Google Gemini API (`googlePalmApi`):** Credential ID `9pUlYyCqAwOgAvb8` (`tiwarivivek102006@gmail.com`) — **AUTHENTICATION_VERIFIED** (Active model: `models/gemini-flash-latest`).
+- **Connected Services & Verification Status:**
+  - **Google Gemini API (`googlePalmApi`):** Credential ID `9pUlYyCqAwOgAvb8` (`tiwarivivek102006@gmail.com`) — **AUTHENTICATION_VERIFIED** (Active model: `models/gemini-2.5-flash`).
+  - **Local Ollama Strategic Engine (`n8n-nodes-base.httpRequest`):** Connected to local Ollama instance at `http://127.0.0.1:11434/api/chat` running `qwen3:8b` (8.2B parameter model). **AUTHENTICATION_VERIFIED / ZERO-CREDENTIAL** (Local native inference on MacBook Air M4).
   - **Google Sheets OAuth2 API (`googleSheetsOAuth2Api`):** Credential ID `JQRGvtvkfjEPF9WK` (`srisaikirantambalkar@gmail.com`) — **AUTHENTICATION_VERIFIED** for Google Sheets API; live writes verified to spreadsheet `VenturelyHub` (`15__ZAea7cXNS0U3sd-GzsTuZWSFMIgomM_EHPjUr5N4`).
-  - **Anthropic Claude API (`anthropicApi`):** Pending credential configuration in n8n runtime (**AUTHENTICATION_FAILED** / Unset). The pipeline continues smoothly via `onError: continueRegularOutput` with deterministic fallback.
+  - **Anthropic Claude API (`anthropicApi`):** **REMOVED**. Completely replaced by local Ollama Qwen3 8B. Zero external Claude dependencies remain in the workflow.
 
 

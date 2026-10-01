@@ -61,7 +61,7 @@ This catalogue tracks all n8n workflows managed within the VenturelyHub Marketin
   2. Input Validation: Enforces required `organization_name`, sanitizes URLs/location, identifies test fixtures
   3. Factual Research (Gemini): Uses Google Search and domain context to extract structured factual profile (programs, technologies, activities, public contact roles) with strict source citation
   4. Factual Structuring: Parses, validates research density, activates fallback if sparse
-  5. Strategic Fit Analysis (Claude): Evaluates VenturelyHub relevance, fit level (`HIGH`, `MEDIUM`, `LOW`, `INSUFFICIENT_DATA`), maps matching services, recommends segment-specific offer, crafts value proposition, personalization angle, and anticipates objections
+  5. Strategic Fit Analysis (Ollama Qwen3 8B): Evaluates VenturelyHub relevance, fit level (`HIGH`, `MEDIUM`, `LOW`, `INSUFFICIENT_DATA`), maps matching services, recommends segment-specific offer, crafts value proposition, personalization angle, and anticipates objections
   6. Output Formatting: Assembles contract-compliant payload
   7. Sheet Payload Preparation: Extracts flattened summary columns, preserves complete `raw_output_json`, assigns unique `execution_id`
   8. Persistent Audit Append: Appends record to `VenturelyHub` Google Spreadsheet (`Prospect Intelligence Outputs` on success, `System Events` on validation failure) with non-blocking error handling (`continueRegularOutput`)
@@ -70,13 +70,14 @@ This catalogue tracks all n8n workflows managed within the VenturelyHub Marketin
   - Standalone pipeline; no external workflow dependencies
 - **Credential Requirements & Verification Status:**
   - Google Gemini API (`googlePalmApi`): Credential ID `9pUlYyCqAwOgAvb8` (`tiwarivivek102006@gmail.com`) — `AUTHENTICATION_VERIFIED`
+  - Local Ollama API: Zero-credential HTTP endpoint (`http://127.0.0.1:11434/api/chat`, model `qwen3:8b`) — `AUTHENTICATION_VERIFIED / NATIVE_LOCAL`
   - Google Sheets OAuth2 API (`googleSheetsOAuth2Api`): Credential ID `JQRGvtvkfjEPF9WK` (`srisaikirantambalkar@gmail.com`) — `AUTHENTICATION_VERIFIED`
-  - Anthropic API (`anthropicApi`): Unset / pending in local runtime (`AUTHENTICATION_FAILED`; deterministic fallback active)
+  - Anthropic API: Removed. Replaced by local Ollama Qwen3 8B.
 - **Target Resources:**
   - Webhook endpoint: `/webhook/prospect-intelligence`
   - Spreadsheet: `VenturelyHub` (ID: `15__ZAea7cXNS0U3sd-GzsTuZWSFMIgomM_EHPjUr5N4`)
   - Target Worksheets: `Prospect Intelligence Outputs`, `System Events` (and 6 future phase worksheets)
-- **Current Status:** Implemented, 100% node validation pass, live runtime verified (Execution 3 success append & Execution 4 error append confirmed in Google Sheets), synchronized with live local n8n runtime, safely inactive.
+- **Current Status:** Implemented, 100% node validation pass, live runtime verified (Executions 7-12 verified across all 6 test scenarios with Qwen3 8B local inference and live Google Sheets appends), synchronized with live local n8n runtime, safely inactive.
 
 
 

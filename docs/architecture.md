@@ -20,7 +20,7 @@ This document defines the high-level technical architecture, operational boundar
 |          VENTURELYHUB MARKETING & SALES AUTOMATION          |
 |                                                             |
 |  - Stateless workflow orchestration via n8n                 |
-|  - Dual-LLM intelligence engine (Gemini + Claude)           |
+|  - Dual-LLM intelligence engine (Gemini + Local Ollama Qwen3 8B) |
 |  - Explicit human control on all outbound actions           |
 +-------------------------------------------------------------+
 ```
@@ -53,7 +53,7 @@ The system leverages specialized models to enforce a clear separation between **
                                   │
                                   ▼
       ┌────────────────────────────────────────────────────────┐
-      │             ANTHROPIC CLAUDE (STRATEGY ENGINE)         │
+      │         LOCAL OLLAMA / QWEN3 8B (STRATEGY ENGINE)      │
       │  - VenturelyHub service mapping & relevance            │
       │  - Qualitative fit classification (HIGH/MED/LOW/INSUFF)│
       │  - Tailored offer design & value proposition           │
