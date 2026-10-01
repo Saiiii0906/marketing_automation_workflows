@@ -110,3 +110,31 @@ This catalogue tracks all n8n workflows managed within the VenturelyHub Marketin
   - Spreadsheet: `VenturelyHub` (ID: `15__ZAea7cXNS0U3sd-GzsTuZWSFMIgomM_EHPjUr5N4`)
   - Target Worksheets: `Outbound Generation Outputs`, `System Events`
 - **Current Status:** Implemented, 100% node validation pass, live runtime verified (Executions 13-18 verified across all 6 test scenarios with Qwen3 8B local inference and live Google Sheets appends), synchronized with live local n8n runtime, safely inactive.
+
+---
+
+### 5. VenturelyHub Outreach Approval & Execution
+
+- **Repository Filename:** `03_outreach_execution/outreach_execution.json`
+- **Workflow Name:** `VenturelyHub Outreach Approval & Execution`
+- **Live n8n Workflow ID:** `vhOutboundExec001`
+- **Active Status:** `INACTIVE` (`active: false`)
+- **Total Nodes:** 15 nodes (13 functional execution nodes + 2 sticky documentation notes)
+- **Purpose:** Gated outbound dispatch engine enforcing human authorization and executing verified email dispatches:
+  1. Trigger: `POST /webhook/outreach-execution`
+  2. Input Validation & Integrity Guard: Enforces `approval_status == "APPROVED"`, `claims_validation_status == "VERIFIED"`, valid email syntax, test mode recipient restrictions (`srisaikirantambalkar@gmail.com`), and verifies deterministic content hash (`approved_message_hash == h_<fnv1a64>`).
+  3. Replay Protection: Evaluates `send_key` (`md5(recipient_email + "::" + subject + "::" + source_execution_id)`) to prevent duplicate outreach.
+  4. Gmail Dispatch: Sends exact approved email text via Gmail integration node with `onError: continueRegularOutput` for fault isolation.
+  5. Audit Formulation: Compiles execution metadata (`execution_id`, `message_id`, `send_status`, `sent_at`).
+  6. Persistent Audit Append: Appends record to `VenturelyHub` Google Spreadsheet (`Outreach Execution Outputs` tab on dispatch attempt, `System Events` tab on rejection or duplicate prevent).
+  7. Direct Caller Response: Returns complete execution outcome JSON directly to caller.
+- **Dependencies:**
+  - Ingests approved draft packages produced by Phase 2 (`vhOutboundGen001`) with explicit human authorization.
+- **Credential Requirements & Verification Status:**
+  - Google Sheets OAuth2 API (`googleSheetsOAuth2Api`): Credential ID `JQRGvtvkfjEPF9WK` (`srisaikirantambalkar@gmail.com`) — `AUTHENTICATION_VERIFIED`
+  - Gmail OAuth2 API (`gmailOAuth2`): Currently unconfigured in local n8n instance (`GMAIL_CREDENTIAL_REQUIRED`). Caught non-blockingly at runtime; logs execution attempt with `status = FAILED`.
+- **Target Resources:**
+  - Webhook endpoint: `/webhook/outreach-execution`
+  - Spreadsheet: `VenturelyHub` (ID: `15__ZAea7cXNS0U3sd-GzsTuZWSFMIgomM_EHPjUr5N4`)
+  - Target Worksheets: `Outreach Execution Outputs`, `System Events`
+- **Current Status:** Implemented, 100% node validation pass, live runtime verified (Executions 20-31 across 10 verification test cases), synchronized with live local n8n runtime, safely inactive.

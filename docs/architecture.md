@@ -90,6 +90,15 @@ The system leverages specialized models to enforce a clear separation between **
 - **Audit Storage Layer:** Appends execution record to `VenturelyHub` spreadsheet (`Outbound Generation Outputs` on success, `System Events` on error).
 - **Direct Response Layer:** Delivers complete multi-channel campaign package directly to caller.
 
+#### Phase 3: Outreach Approval & Execution Pipeline (`03_outreach_execution/`)
+- **Trigger Layer:** Webhook receiving approved draft payload (`POST /webhook/outreach-execution`).
+- **Validation & Tamper Detection Layer:** Enforces `approval_status == "APPROVED"`, `claims_validation_status == "VERIFIED"`, valid email syntax, test recipient restrictions (`srisaikirantambalkar@gmail.com`), and validates deterministic content hash (`approved_message_hash == h_<fnv1a64>`).
+- **Replay Protection Layer:** Evaluates `send_key` (`md5(recipient_email + "::" + subject + "::" + source_execution_id)`) to prevent duplicate outreach.
+- **Dispatch Layer:** Gmail node sends approved subject and body verbatim. Zero LLM rewriting at send time. Configured with `onError: continueRegularOutput` for resilient failure isolation.
+- **Audit Formulation Layer:** Formulates execution record including `execution_id`, `message_id`, and `send_status`.
+- **Audit Storage Layer:** Appends execution record to `VenturelyHub` spreadsheet (`Outreach Execution Outputs` tab on dispatch attempt, `System Events` tab on rejection or duplicate prevent).
+- **Direct Response Layer:** Delivers complete execution status directly to caller.
+
 ---
 
 ### 4. Cross-Phase Google Sheets Execution & Output Audit Store
