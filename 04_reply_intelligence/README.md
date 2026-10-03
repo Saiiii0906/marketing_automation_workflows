@@ -29,31 +29,26 @@ Its sole purpose is to detect, normalize, interpret, and commercially classify i
 
 ## 2. Inbound Gmail Ingestion Architecture
 
-### Evaluation of n8n Gmail Ingestion Options
+### Primary Production Ingestion Mechanism: Native Gmail Trigger (`n8n-nodes-base.gmailTrigger`)
 
-We inspected the live n8n runtime (`v2.41.3`) and identified three possible ingestion patterns:
+Based on our inspection of the live n8n installation (`v2.41.3`), the workflow uses **`n8n-nodes-base.gmailTrigger` (v1.4)** as its **single primary production entry point**.
 
-1. **Option A: Polling Trigger (`n8n-nodes-base.gmailTrigger`)**
-   - *Characteristics:* Polling interval (e.g., every 5 minutes), filter query parameter `q`, retrieves unread messages.
-   - *Considerations:* Automatically triggers workflow executions on inbox polling. Requires strict filtering (`q`) to avoid processing irrelevant personal or operational emails; marks messages as read or labels them to prevent reprocessing loops.
-2. **Option B: Scheduled Poller with Webhook / Scheduled Search (`n8n-nodes-base.scheduleTrigger` + `n8n-nodes-base.gmail` `message:getAll`)**
-   - *Characteristics:* Cron-driven batch poll with explicit search query `q: "to:srisaikirantambalkar@gmail.com -from:srisaikirantambalkar@gmail.com is:unread"` and controlled item handling.
-   - *Considerations:* Enables precise rate-limiting, batch inspection, and single-item isolation before downstream processing.
-3. **Option C: Webhook-Driven Ingestion (`n8n-nodes-base.webhook`)**
-   - *Characteristics:* Immediate processing of specific incoming payloads or test fixtures; ideal for decoupled orchestrations, manual testing, or event-driven push webhooks from a Gmail pub/sub listener.
-   - *Considerations:* Essential for deterministic contract validation, test fixtures, and controlled execution.
+We selected `n8n-nodes-base.gmailTrigger` because:
+1. It is the native, battle-tested n8n polling trigger designed specifically for event-driven Gmail message fetching.
+2. It directly leverages the authorized `gmailOAuth2` credential (`Z5LunU63lEhN8WRL` - `srisaikirantambalkar@gmail.com`).
+3. It avoids unnecessary architectural bifurcation by serving as the unified entry point for inbound reply monitoring.
 
-### Recommended Production Ingestion Design
-To maximize safety and maintain consistency with Phases 1, 2, and 3:
-- **Primary Operational Core:** Webhook endpoint (`POST /webhook/reply-intelligence`) capable of ingesting:
-  - Direct message payloads (from automated Gmail watchers or test harnesses).
-  - Normalized email objects containing raw headers, body, threadId, and messageId.
-- **Gmail Retrieval Node Integration:** When a payload supplies a `message_id` or `thread_id`, the workflow uses the native `n8n-nodes-base.gmail` node (credential: `Z5LunU63lEhN8WRL`) to fetch full thread context (`thread:get` or `message:get`) with `simple: false` to parse MIME headers, In-Reply-To, References, and message history.
-- **Search Query Filter Boundaries:**
-  - `is:unread`
-  - `to:me`
-  - `-from:me` (prevents self-replies from triggering analysis)
-  - Excludes promotional/spam categories: `-category:promotions -category:spam`
+### Ingestion Filter Specifications
+To strictly avoid processing arbitrary, personal, or promotional mail, the `gmailTrigger` is configured with deterministic query filters:
+- **Search Query (`filters.q`):**
+  ```
+  to:srisaikirantambalkar@gmail.com -from:srisaikirantambalkar@gmail.com is:unread -category:promotions -category:spam
+  ```
+- **Read Status (`filters.readStatus`):** `unread`
+- **Drafts Excluded (`filters.includeDrafts`):** `false`
+- **Spam & Trash Excluded (`filters.includeSpamTrash`):** `false`
+- **Polling Interval (`pollTimes`):** Configurable interval (default: every 5 minutes in production; manually triggered or pinned in testing).
+- **Lightweight Fetching (`simple: false` downstream):** Trigger fetches lightweight metadata (`simple: true`), and full MIME headers (`In-Reply-To`, `References`, body) are retrieved as needed to conserve memory and avoid OOM risks.
 
 ---
 
@@ -93,20 +88,22 @@ To determine which Phase 3 outbound execution an incoming reply corresponds to, 
 
 ## 4. Execution-Level Deduplication Strategy
 
-To prevent repeatedly analyzing the same email message whenever an inbox check occurs:
+To prevent repeatedly analyzing the same inbound message across polling intervals:
 
 1. **Composite Deduplication Identity:**
    $$\text{dedup\_key} = \text{message\_id} \parallel \text{"::"} \parallel \text{thread\_id} \parallel \text{"::"} \parallel \text{sender\_email}$$
-2. **Execution Gate:**
-   - Evaluated in `CHECK_AlreadyProcessed` using n8n workflow static data (`$getWorkflowStaticData('global').processedMessageIds`).
-   - If `dedup_key` exists in `processedMessageIds`:
-     - Workflow immediately routes to `DUPLICATE_PREVENTED`.
-     - Logs event to `System Events` in Google Sheets.
-     - Returns `status: "ALREADY_PROCESSED"`.
-     - LLM inference is **never** invoked for duplicate messages.
-3. **Guarantees & Scope:**
-   - *Guaranteed:* At-least-once ingestion with idempotent execution-level suppression.
-   - *Boundary:* This is not a distributed database; deduplication is bounded to the operational life of the n8n static data store and Google Sheets audit log.
+2. **Two-Tier Deduplication Hierarchy:**
+   - **Tier 1 (Runtime-Level):** Evaluated in `CHECK_AlreadyProcessed` via n8n workflow static data (`$getWorkflowStaticData('global').processedMessageIds`). This provides fast in-memory suppression during continuous active runtime execution.
+   - **Tier 2 (Cross-Restart Persistence):** When workflow runtime restarts or resets static data, the deduplication node checks the `Reply Intelligence Outputs` worksheet in Google Sheets (or checks `System Events`) for previously processed `source_message_id` records before proceeding.
+3. **Execution Gate Routing:**
+   - If `dedup_key` or `source_message_id` already exists:
+     - The workflow immediately branches to `DUPLICATE_PREVENTED`.
+     - Logs the event to `System Events` in Google Sheets.
+     - Returns structured status: `status: "ALREADY_PROCESSED"`.
+     - LLM inference and downstream processing are strictly bypassed.
+4. **Guarantees & Exact Boundaries:**
+   - **At-least-once ingestion** with idempotent suppression is guaranteed.
+   - **"Exactly-once" processing is NOT claimed**, because distributed network polling and external API retries can theoretically deliver duplicate webhook/poll triggers before state is committed. The architecture enforces idempotent handling rather than theoretical exactly-once delivery.
 
 ---
 
@@ -124,8 +121,8 @@ The system defines 16 mutually exclusive primary classifications:
 | `OBJECTION` | Prospect raises specific hesitations (e.g., already have agency, budget frozen, tech mismatch) | Recommended |
 | `NOT_INTERESTED` | Prospect politely or firmly declines services without hostility | Optional |
 | `UNSUBSCRIBE` | Prospect requests removal, stops future emails, or mentions spam | **Mandatory** |
-| `OUT_OF_OFFICE` | Automated vacation, leave, or sabbatical autoresponder | Auto-Handled |
-| `AUTOMATED_REPLY` | Delivery receipts, generic ticketing confirmation, or system auto-responses | Auto-Handled |
+| `OUT_OF_OFFICE` | Automated vacation, leave, or sabbatical autoresponder | Automatically Classified |
+| `AUTOMATED_REPLY` | Delivery receipts, generic ticketing confirmation, or system auto-responses | Automatically Classified |
 | `COMPLAINT` | Prospect expresses anger, frustration, or negative feedback regarding contact | **Mandatory** |
 | `AMBIGUOUS` | Unclear, cryptic, single-word, or context-free response | **Mandatory** |
 | `WRONG_RECIPIENT` | Prospect indicates they are not the appropriate department, contact, or company | Optional |
@@ -213,22 +210,29 @@ Ollama (`qwen3:8b`) produces a structured response plan:
 `safety.human_review_required` is evaluated using deterministic code rules:
 - **Pricing & Commercial Terms:** If `PRICING_REQUEST` or `NEGOTIATION` $\rightarrow$ `human_review_required: true`.
 - **Legal & Commitments:** Any mention of SLAs, guarantees, contracts, or warranties $\rightarrow$ `human_review_required: true`.
-- **Complaints & Grievances:** If `COMPLAINT` $\rightarrow$ `human_review_required: true`, `do_not_contact: true`.
+- **Complaints & Grievances:** If `COMPLAINT` $\rightarrow$ `human_review_required: true`.
+  - `do_not_contact = true` **ONLY** when explicit opt-out or do-not-contact language is detected in the message.
+  - Otherwise `do_not_contact = false`.
+  - `unsubscribe_detected = true` **ONLY** when explicit unsubscribe / opt-out intent exists.
+  - Keeps complaint classification strictly separate from unsubscribe intent.
 - **Unsubscribe Requests:** If `UNSUBSCRIBE` $\rightarrow$ `human_review_required: true`, `unsubscribe_detected: true`, `do_not_contact: true`.
 - **Low Confidence:** If classification confidence $< 0.80$ $\rightarrow$ `human_review_required: true`, `review_reason: ["LOW_CONFIDENCE_CLASSIFICATION"]`.
 
-### 2. Unsubscribe & Do-Not-Contact Safety Policy
+### 2. Unsubscribe & Suppression Recommendation Policy
+- **No Suppression Database:** Phase 4 does **NOT** create, maintain, or modify any suppression database, CRM contact list, or campaign database.
 - When `unsubscribe_detected: true`:
   - `send_allowed: false`
   - `do_not_contact: true`
-  - `recommended_next_action: "SUPPRESS_FROM_FUTURE_CAMPAIGNS"`
-  - Logged to `System Events` for human operator audit.
+  - `recommended_next_action: "MARK_FOR_MANUAL_SUPPRESSION"` (intelligence recommendation only for human review)
+  - Logged to `System Events` for human operator inspection.
   - Zero auto-replies generated.
 
 ### 3. Out-Of-Office (OOO) Policy
-- Automated responses are flagged with `reply_type: "OUT_OF_OFFICE"`.
-- Returns explicit `return_date` and `alternate_contact` only if explicitly parsed in the message text.
-- Does not invent follow-up tasks or dates.
+- Out-of-office autoresponders are **automatically classified** (`reply_type: "OUT_OF_OFFICE"`).
+- Extracts explicitly stated `return_date` if present in the text.
+- Extracts explicitly stated `alternate_contact` if present in the text.
+- Recommends next action (e.g., `DEFER_FOLLOW_UP_UNTIL_RETURN`).
+- **Never** automatically sends a response or creates automated follow-up calendar tasks.
 
 ---
 
@@ -376,21 +380,23 @@ Worksheet: **`Reply Intelligence Outputs`** in Spreadsheet `VenturelyHub` (`15__
 | **5** | Information Request | "Do your engineers have experience integrating LangChain and Pinecone?" | `INFORMATION_REQUEST` | Optional | `questions` extracted; `send_allowed: false` |
 | **6** | Objection | "We already have an internal engineering team of 12 people." | `OBJECTION` | Recommended | `objections` extracted; `recommended_next_action: ADDRESS_OBJECTION` |
 | **7** | Not Interested | "Thanks, but we do not need external tech partners at this time." | `NOT_INTERESTED` | Optional | `interest_level: NONE`; `recommended_next_action: CLOSE_LOOP` |
-| **8** | Unsubscribe | "Please unsubscribe me and remove our company from your mailing list." | `UNSUBSCRIBE` | **Mandatory** | `unsubscribe_detected: true`, `do_not_contact: true`, `send_allowed: false` |
-| **9** | Out of Office | "I am out of the office until Oct 14 with limited access to email." | `OUT_OF_OFFICE` | Auto-Handled | `return_date: "2026-10-14"` extracted; no auto-reply |
-| **10** | Automated System Reply | "Your message was received by Support Ticket #49201." | `AUTOMATED_REPLY` | Auto-Handled | Ignored from commercial pipeline; logged |
-| **11** | Complaint | "Stop emailing our staff. This is spam and we will report your domain." | `COMPLAINT` | **Mandatory** | `do_not_contact: true`; escalated in `System Events` |
-| **12** | Ambiguous Reply | "Interesting." / "Hmm maybe." / "Ok." | `AMBIGUOUS` | **Mandatory** | `review_reason: ["AMBIGUOUS_REPLY"]`; `send_allowed: false` |
-| **13** | Wrong Recipient | "I am in accounting, I don't handle technology decisions." | `WRONG_RECIPIENT` | Optional | `recommended_next_action: CLOSE_LOOP` |
-| **14** | Referral | "I don't handle this, but please reach out to our VP of Eng, Sarah at sarah@acme.com." | `REFERRAL` | Recommended | Referred contact extracted; `human_review_required: true` |
-| **15** | Multi-Question Complex | Reply with 4 detailed architectural questions and a compliance inquiry | `INFORMATION_REQUEST` | **Mandatory** | All 4 questions isolated into `questions` array |
-| **16** | Correlated Gmail Thread | Message contains `In-Reply-To` matching Phase 3 message ID `1a0f8eef3102d853` | Any valid taxonomy | Based on type | `correlation_status: CORRELATED`; links to source execution |
-| **17** | Unresolved Correlation | Inbound cold inquiry or reply with stripped headers and unknown subject | Any valid taxonomy | Based on type | `correlation_status: UNRESOLVED`; `source_execution_id: null` |
-| **18** | Duplicate Inbound Replay | Resubmission of already processed `message_id` | N/A (Bypassed) | N/A | Intercepted at `CHECK_AlreadyProcessed`; logs `ALREADY_PROCESSED` to `System Events` |
-| **19** | Malformed / Empty Body | Inbound email with 0 text content or null body | N/A | **Mandatory** | Validation fails; returns `MALFORMED_INPUT`; logs to `System Events` |
-| **20** | Ollama Model Timeout | Local Ollama instance fails to respond within timeout window | N/A | **Mandatory** | Falls back to deterministic rule classifier; flags `FALLBACK_APPLIED` |
-| **21** | Malformed Model JSON | Ollama outputs broken JSON syntax | N/A | **Mandatory** | JSON repair parser activated; falls back to rule classifier |
-| **22** | Low-Confidence Inference | Model confidence $< 0.75$ on subtle or mixed message | `AMBIGUOUS` | **Mandatory** | Flags `LOW_CONFIDENCE_CLASSIFICATION`; human review required |
+| **8** | Unsubscribe | "Please unsubscribe me and remove our company from your mailing list." | `UNSUBSCRIBE` | **Mandatory** | `unsubscribe_detected: true`, `do_not_contact: true`, `recommended_next_action: "MARK_FOR_MANUAL_SUPPRESSION"`, `send_allowed: false` |
+| **9** | Out of Office | "I am out of the office until Oct 14 with limited access to email." | `OUT_OF_OFFICE` | Automatically Classified | `return_date: "2026-10-14"` extracted; no auto-reply; `send_allowed: false` |
+| **10** | Automated System Reply | "Your message was received by Support Ticket #49201." | `AUTOMATED_REPLY` | Automatically Classified | Ignored from commercial pipeline; logged to System Events |
+| **11** | Complaint (General) | "Your cold email interrupted my workday. This approach is annoying." | `COMPLAINT` | **Mandatory** | `human_review_required: true`, `do_not_contact: false` (no opt-out language), `unsubscribe_detected: false`, escalated in `System Events` |
+| **12** | Complaint (With Opt-Out) | "Stop emailing our team immediately. Do not contact us again." | `COMPLAINT` | **Mandatory** | `human_review_required: true`, `do_not_contact: true`, `unsubscribe_detected: true`, `recommended_next_action: "MARK_FOR_MANUAL_SUPPRESSION"` |
+| **13** | Ambiguous Reply | "Interesting." / "Hmm maybe." / "Ok." | `AMBIGUOUS` | **Mandatory** | `review_reason: ["AMBIGUOUS_REPLY"]`; `send_allowed: false` |
+| **14** | Wrong Recipient | "I am in accounting, I don't handle technology decisions." | `WRONG_RECIPIENT` | Optional | `recommended_next_action: CLOSE_LOOP` |
+| **15** | Referral | "I don't handle this, but please reach out to our VP of Eng, Sarah at sarah@acme.com." | `REFERRAL` | Recommended | Referred contact extracted; `human_review_required: true` |
+| **16** | Multi-Question Complex | Reply with 4 detailed architectural questions and a compliance inquiry | `INFORMATION_REQUEST` | **Mandatory** | All 4 questions isolated into `questions` array |
+| **17** | Correlated Gmail Thread | Message contains `In-Reply-To` matching Phase 3 message ID `1a0f8eef3102d853` | Any valid taxonomy | Based on type | `correlation_status: CORRELATED`; links to source execution |
+| **18** | Unresolved Correlation | Inbound cold inquiry or reply with stripped headers and unknown subject | Any valid taxonomy | Based on type | `correlation_status: UNRESOLVED`; `source_execution_id: null` |
+| **19** | Duplicate Inbound (Runtime) | Immediate resubmission of processed `message_id` within active runtime | N/A (Bypassed) | N/A | Intercepted by Tier 1 static data; logs `ALREADY_PROCESSED` to `System Events` |
+| **20** | Duplicate Inbound (Cross-Restart) | Resubmission of processed `message_id` after workflow restart / cache clear | N/A (Bypassed) | N/A | Intercepted by Tier 2 Google Sheets audit lookup; logs `ALREADY_PROCESSED` to `System Events` |
+| **21** | Malformed / Empty Body | Inbound email with 0 text content or null body | N/A | **Mandatory** | Validation fails; returns `MALFORMED_INPUT`; logs to `System Events` |
+| **22** | Ollama Model Timeout | Local Ollama instance fails to respond within timeout window | N/A | **Mandatory** | Falls back to deterministic rule classifier; flags `FALLBACK_APPLIED` |
+| **23** | Malformed Model JSON | Ollama outputs broken JSON syntax | N/A | **Mandatory** | JSON repair parser activated; falls back to rule classifier |
+| **24** | Low-Confidence Inference | Model confidence $< 0.75$ on subtle or mixed message | `AMBIGUOUS` | **Mandatory** | Flags `LOW_CONFIDENCE_CLASSIFICATION`; human review required |
 
 ---
 

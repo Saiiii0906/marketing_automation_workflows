@@ -148,12 +148,12 @@ This catalogue tracks all n8n workflows managed within the VenturelyHub Marketin
 - **Planned n8n Workflow ID:** `vhReplyInt001`
 - **Planned Status:** `INACTIVE` (`active: false`)
 - **Purpose:** Inbound email response evaluation and commercial reasoning pipeline:
-  1. Trigger Layer: Ingests inbound reply payloads via webhook (`POST /webhook/reply-intelligence`) or filtered polling.
-  2. Deduplication Layer: Evaluates composite `dedup_key` (`message_id::thread_id::sender_email`) to eliminate duplicate evaluations.
+  1. Trigger Layer: Primary production ingestion via filtered native Gmail Trigger (`n8n-nodes-base.gmailTrigger`) targeting unread replies, with support for webhook-pinned test fixtures (`POST /webhook/reply-intelligence`).
+  2. Deduplication Layer: Two-tier deduplication hierarchy combining runtime static data suppression with cross-restart Google Sheets audit lookup on `message_id`. Exactly-once processing is not claimed; idempotent suppression is strictly enforced.
   3. Correlation Layer: Resolves inbound replies to previous Phase 3 outbound executions via In-Reply-To, References, and Gmail thread IDs.
   4. Message Normalization: Strips quotation history, removes legal disclaimers, and normalizes sender metadata.
   5. AI Reasoning (Local Ollama Qwen3 8B): Classifies message into a 16-category taxonomy, extracts explicit vs inferred buying signals and objections, and drafts a strategic response brief.
-  6. Deterministic Safety Enforcement: Hardcodes `send_allowed: false`. Evaluates mandatory human review policies (pricing, negotiations, complaints, legal, low confidence, and unsubscribe detection).
+  6. Deterministic Safety Enforcement: Hardcodes `send_allowed: false`. Evaluates mandatory human review policies (pricing, negotiations, complaints, legal, low confidence, and unsubscribe detection). Keeps complaint classification separate from opt-out intent. Recommends `MARK_FOR_MANUAL_SUPPRESSION` without maintaining a suppression database.
   7. Audit Storage: Appends record to `VenturelyHub` Google Spreadsheet (`Reply Intelligence Outputs` on evaluation, `System Events` on operational error).
   8. Direct Caller Response: Delivers complete structured intelligence JSON payload directly to caller.
 - **Dependencies:**
@@ -161,10 +161,10 @@ This catalogue tracks all n8n workflows managed within the VenturelyHub Marketin
   - Dispatches follow-up responses strictly through Phase 3 (`vhOutboundExec001`) after explicit human approval.
 - **Credential Requirements:**
   - Google Sheets OAuth2 API (`googleSheetsOAuth2Api`): Credential ID `JQRGvtvkfjEPF9WK` (`srisaikirantambalkar@gmail.com`)
-  - Gmail OAuth2 API (`gmailOAuth2`): Credential ID `Z5LunU63lEhN8WRL` (`srisaikirantambalkar@gmail.com`) for thread fetching
+  - Gmail OAuth2 API (`gmailOAuth2`): Credential ID `Z5LunU63lEhN8WRL` (`srisaikirantambalkar@gmail.com`) for inbound monitoring and thread fetching
   - Local Ollama API: Zero-credential HTTP endpoint (`http://127.0.0.1:11434/api/chat`, model `qwen3:8b`)
 - **Target Resources:**
-  - Webhook endpoint: `/webhook/reply-intelligence`
+  - Ingestion entry point: `n8n-nodes-base.gmailTrigger` (primary production) / `/webhook/reply-intelligence` (testing)
   - Spreadsheet: `VenturelyHub` (ID: `15__ZAea7cXNS0U3sd-GzsTuZWSFMIgomM_EHPjUr5N4`)
   - Target Worksheets: `Reply Intelligence Outputs`, `System Events`
-- **Current Status:** Architecture and Contract Design Phase complete. Detailed contracts and 22-scenario test matrix documented in `04_reply_intelligence/README.md`. Awaiting implementation authorization.
+- **Current Status:** Architecture & Contract Design Hardening (Phase 4.0.1) complete. Detailed contracts, single primary ingestion entry point, complaint/suppression decoupling, and 24-scenario test matrix documented in `04_reply_intelligence/README.md`. Awaiting implementation authorization.

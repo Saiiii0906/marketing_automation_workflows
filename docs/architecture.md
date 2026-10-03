@@ -100,12 +100,12 @@ The system leverages specialized models to enforce a clear separation between **
 - **Direct Response Layer:** Delivers complete execution status directly to caller.
 
 #### Phase 4: Reply Intelligence Pipeline (`04_reply_intelligence/`)
-- **Trigger Layer:** Inbound reply ingestion via webhook (`POST /webhook/reply-intelligence`) or filtered polling.
-- **Deduplication Layer:** Evaluates composite key (`message_id::thread_id::sender_email`) to eliminate duplicate evaluations.
+- **Trigger Layer:** Primary production ingestion via filtered native Gmail Trigger (`n8n-nodes-base.gmailTrigger`) targeting unread replies, with support for webhook-pinned test fixtures (`POST /webhook/reply-intelligence`).
+- **Deduplication Layer:** Two-tier deduplication hierarchy combining runtime static data suppression with cross-restart Google Sheets audit lookup on `message_id`. Exactly-once processing is not claimed; idempotent suppression is strictly enforced.
 - **Correlation Layer:** Resolves inbound replies to previous Phase 3 outbound executions via In-Reply-To, References, and thread IDs.
 - **Normalization Layer:** Cleans quotation history, strips disclaimer boilerplate, and normalizes sender metadata.
 - **Intelligence & Strategy Layer:** Local Ollama Qwen3 8B (`qwen3:8b`) interprets commercial intent, classifies response into 16-category taxonomy, identifies buying signals/objections, and drafts a suggested response strategy.
-- **Deterministic Safety Guard:** Enforces `send_allowed: false` across all paths. Evaluates mandatory human review policies (pricing, negotiations, complaints, legal, low confidence, and unsubscribe detection).
+- **Deterministic Safety Guard:** Enforces `send_allowed: false` across all paths. Evaluates mandatory human review policies (pricing, negotiations, complaints, legal, low confidence, and unsubscribe detection). Keeps complaint classification separate from opt-out intent. Recommends `MARK_FOR_MANUAL_SUPPRESSION` without maintaining a suppression database.
 - **Audit Storage Layer:** Appends execution record to `VenturelyHub` spreadsheet (`Reply Intelligence Outputs` on evaluation, `System Events` on operational error).
 - **Direct Response Layer:** Returns complete structured intelligence JSON payload directly to caller.
 
